@@ -593,3 +593,153 @@ def wait_for_message(
         time.sleep(0.2)
     msg = f"{text!r} not in {log_messages(app, tag)}"
     raise TimeoutError(msg)
+
+
+def wait_for_text(app: QFieldApp, text: str, timeout: float = 5) -> None:
+    """Wait until visible text containing `text` shows, a toast for example."""
+    app.wait(
+        "return walkAll(scene(), i => i.visible && typeof i.text === 'string'"
+        f" && i.text.indexOf({js(text)}) !== -1, 0).length > 0",
+        timeout,
+        0.05,
+    )
+
+
+def close_feature_form(app: QFieldApp) -> None:
+    """Hide the feature list and form without saving, as the back gesture does."""
+    close_feature_list(app)
+
+
+def highlighted_wkt(app: QFieldApp) -> str | None:
+    """WKT of what the geometry highlighter shows, None when it shows nothing."""
+    return app.eval("""
+      const g = find('geometryHighlighter').geometryWrapper.qgsGeometry;
+      const wkt = g ? String(g.asWkt(0)) : '';
+      return wkt === '' ? null : wkt;
+    """)
+
+
+# Editing
+
+
+def _layer(layer: str) -> str:
+    return f"qgisProject.mapLayersByName({js(layer)})[0]"
+
+
+def geometries(app: QFieldApp, layer: str, expression: str = "") -> list[str]:
+    """WKT of a layer's feature geometries, at most three decimals."""
+    return app.eval(f"""
+      const layer = {_layer(layer)};
+      const it = {_iterator(expression)};
+      const out = [];
+      while (it.hasNext()) out.push(String(it.next().geometry.asWkt(3)));
+      it.close();
+      return out;
+    """)
+
+
+def add_feature(
+    app: QFieldApp, layer: str, wkt: str | None, attributes: dict[str, object]
+) -> None:
+    """Add a feature and commit, the way plugin JS adds features.
+
+    Triggers wired to the layer's `featureAdded` run as in the field.
+    """
+    geometry = f"GeometryUtils.createGeometryFromWkt({js(wkt)})" if wkt else "undefined"
+    app.eval(f"""
+      const layer = {_layer(layer)};
+      layer.startEditing();
+      const f = FeatureUtils.createFeature(layer, {geometry});
+      const values = {js(attributes)};
+      for (const name in values) f.setAttribute(name, values[name]);
+      if (!LayerUtils.addFeature(layer, f)) {{
+        layer.rollBack();
+        throw new Error('addFeature failed');
+      }}
+      if (!layer.commitChanges()) {{
+        const errors = layer.commitErrors ? layer.commitErrors().join('; ') : '';
+        layer.rollBack();
+        throw new Error('commit failed: ' + errors);
+      }}
+    """)
+    time.sleep(0.3)
+
+
+def change_geometry(app: QFieldApp, layer: str, expression: str, wkt: str) -> None:
+    """Replace the geometry of the first matching feature and save.
+
+    This is what QField's vertex editor does through its feature model.
+    """
+    app.eval(f"""
+      const layer = {_layer(layer)};
+      const it = {_iterator(expression)};
+      const f = it.next(); it.close();
+      const model = Qt.createQmlObject('import org.qfield; FeatureModel {{ }}', driver);
+      model.project = qgisProject;
+      model.currentLayer = layer;
+      model.feature = f;
+      const ok = model.changeGeometry(GeometryUtils.createGeometryFromWkt({js(wkt)}))
+        && model.save();
+      model.destroy();
+      if (!ok) throw new Error('changeGeometry failed');
+    """)
+    time.sleep(0.3)
+
+
+def import_js(app: QFieldApp, path: Path, name: str) -> None:
+    """Import a JS module file, so tests call its functions as `state[name]`.
+
+    `state[name].call('function', [args])` runs a function of the module.
+    """
+    url = js(Path(path).resolve().as_uri())
+    app.eval(f"""
+      state[{js(name)}] = Qt.createQmlObject(
+        'import QtQuick; import ' + JSON.stringify({url}) + ' as M;'
+        + 'QtObject {{ function call(n, a) {{ return M[n].apply(null, a); }} }}',
+        driver, {js(name)});
+    """)
+
+
+def wait_visible(
+    app: QFieldApp, object_name: str, *, shown: bool = True, timeout: float = 5
+) -> None:
+    """Wait until an item or popup shows or hides, its transitions done."""
+    app.wait(
+        f"const item = {item_by_name(object_name)};"
+        f"return !!item && item.visible === {js(shown)}",
+        timeout,
+        0.05,
+    )
+
+
+def frame_and_tap(app: QFieldApp, x: float, y: float, half_size: float = 100) -> None:
+    """Pan the map to a project CRS coordinate and tap it, as a user picking there."""
+    frame_map(app, x, y, half_size)
+    tap_map(app, x, y)
+    time.sleep(0.5)
+
+
+def evaluate_expression(
+    app: QFieldApp, expression: str, layer: str | None = None
+) -> Any:  # noqa: ANN401
+    """Value of a QGIS expression in QField's project context, a layer's too.
+
+    QField's evaluator hands values back as text, `1 + 2` gives `"3"`.
+    """
+    context_layer = f"evaluator.layer = {_layer(layer)};" if layer else ""
+    return app.eval(f"""
+      const evaluator = Qt.createQmlObject(
+        'import org.qfield; ExpressionEvaluator {{}}', driver);
+      evaluator.project = qgisProject;
+      {context_layer}
+      const value = evaluator.evaluate({js(expression)});
+      evaluator.destroy();
+      return value;
+    """)
+
+
+def scan_code(app: QFieldApp, text: str, timeout: float = 10) -> None:
+    """Hand text to QField's open code reader, as a decoded QR code would."""
+    app.wait("return find('codeReader').visible", timeout)
+    app.eval(f"find('codeReader').accepted({js(text)});")
+    time.sleep(0.3)

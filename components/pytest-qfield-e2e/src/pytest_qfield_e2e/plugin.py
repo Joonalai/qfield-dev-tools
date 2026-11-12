@@ -94,10 +94,20 @@ def qfield_app_plugins() -> dict[str, Path]:
 
 
 @pytest.fixture
+def qfield_app_settings() -> dict[str, object]:
+    """QField settings written to every profile before QField starts.
+
+    Keys are QSettings keys, `myplugin/interval` for example. Override to set them.
+    """
+    return {}
+
+
+@pytest.fixture
 def qfield_app_factory(
     tmp_path: Path,
     qfield_app_binary: Path,
     qfield_app_plugins: dict[str, Path],
+    qfield_app_settings: dict[str, object],
 ) -> Iterator[Callable[..., QFieldApp]]:
     """Start QField apps, each with its own profile and display.
 
@@ -110,7 +120,12 @@ def qfield_app_factory(
             app_plugins: dict[str, Path] | None = None,
         ) -> QFieldApp:
             plugins = qfield_app_plugins if app_plugins is None else app_plugins
-            app = QFieldApp(qfield_app_binary, tmp_path / name, app_plugins=plugins)
+            app = QFieldApp(
+                qfield_app_binary,
+                tmp_path / name,
+                app_plugins=plugins,
+                settings=qfield_app_settings,
+            )
             return stack.enter_context(app)
 
         yield start

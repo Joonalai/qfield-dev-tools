@@ -83,23 +83,50 @@ def _plugin_settings(main_qml: Path, uuid: str) -> str:
     )
 
 
+def _ini_value(value: object) -> str:
+    if isinstance(value, bool):
+        return str(value).lower()
+    if isinstance(value, str):
+        # Quoted, or QSettings reads commas as a list and eats backslashes.
+        escaped = value.replace("\\", "\\\\").replace('"', '\\"')
+        return f'"{escaped}"'
+    return str(value)
+
+
 def seed_profile(
-    home: Path, endpoint: str, app_plugins: dict[str, Path] | None = None
+    home: Path,
+    endpoint: str,
+    app_plugins: dict[str, Path] | None = None,
+    settings: dict[str, object] | None = None,
 ) -> None:
-    """Install the driver and other app plugins, and turn telemetry off."""
+    """Install the driver and app plugins, and write QField settings.
+
+    Telemetry is turned off as well.
+
+    :param settings: QSettings keys such as `myplugin/interval`, a key without
+        a group goes under `General`
+    """
     driver = install_app_plugin(home, DRIVER_SOURCE, DRIVER_NAME)
     driver.write_text(driver.read_text().replace("__ENDPOINT__", endpoint))
     plugins = _plugin_settings(driver, DRIVER_NAME)
     for uuid, source in (app_plugins or {}).items():
         plugins += _plugin_settings(install_app_plugin(home, source, uuid), uuid)
+    groups: dict[str, list[str]] = {
+        "General": ["enableInfoCollection=false"],
+        "QField": ["showMapCanvasGuide=false"],
+        "qfield": plugins.splitlines(),
+    }
+    for key, value in (settings or {}).items():
+        group, _, name = key.rpartition("/") if "/" in key else ("General", "", key)
+        group, _, rest = group.partition("/")
+        name = f"{rest}\\{name}" if rest else name
+        groups.setdefault(group, []).append(f"{name}={_ini_value(value)}")
     conf = home / ".config/OPENGIS.ch/QField.conf"
     conf.parent.mkdir(parents=True, exist_ok=True)
     conf.write_text(
-        "[General]\n"
-        "enableInfoCollection=false\n\n"
-        "[QField]\n"
-        "showMapCanvasGuide=false\n\n"
-        "[qfield]\n" + plugins
+        "\n".join(
+            f"[{group}]\n" + "\n".join(lines) + "\n" for group, lines in groups.items()
+        )
     )
 
 
@@ -107,6 +134,7 @@ class QFieldApp:
     """One QField process. Never touches the user's profile or other instances.
 
     :param app_plugins: App plugins to install and enable, by uuid
+    :param settings: QField settings written before the start, see `seed_profile`
     """
 
     def __init__(
@@ -115,12 +143,14 @@ class QFieldApp:
         home: Path,
         *,
         app_plugins: dict[str, Path] | None = None,
+        settings: dict[str, object] | None = None,
         screen_size: tuple[int, int] = SCREEN_SIZE,
     ) -> None:
         self._app_run = app_run
         self.home = home
         self.log = home.parent / f"{home.name}.log"
         self._app_plugins = app_plugins
+        self._settings = settings
         self._screen_size = screen_size
         self._sequence = 0
         self._log_offset = 0
@@ -140,7 +170,9 @@ class QFieldApp:
 
     def _start(self) -> None:
         self.home.mkdir(parents=True, exist_ok=True)
-        seed_profile(self.home, self._bridge.endpoint, self._app_plugins)
+        seed_profile(
+            self.home, self._bridge.endpoint, self._app_plugins, self._settings
+        )
         self._xvfb, display_number = start_xvfb(*self._screen_size)
         self._pointer = Pointer(display_number)
         env = {
