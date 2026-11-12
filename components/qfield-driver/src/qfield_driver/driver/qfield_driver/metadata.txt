@@ -1,0 +1,5 @@
+[general]
+name=qfield-driver
+description=Plugin that runs code sent by qfield-driver
+author=qfield-dev-tools Contributors
+version=1.0.0
