@@ -54,3 +54,9 @@ jobs:
         with:
           component: pytest-qfield-e2e
           github_token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Release qfield-mcp
+        uses: ./.github/actions/release-component
+        with:
+          component: qfield-mcp
+          github_token: ${{ secrets.GITHUB_TOKEN }}

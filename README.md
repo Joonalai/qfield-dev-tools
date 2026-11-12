@@ -12,3 +12,5 @@ Tools for developing and testing [QField](https://github.com/opengisch/QField) a
   [![PyPI](https://img.shields.io/pypi/v/qfield-driver)](https://pypi.org/project/qfield-driver)
 - [pytest-qfield-e2e](components/pytest-qfield-e2e/README.md): pytest fixtures for QField plugin and end-to-end tests against a real QField app.
   [![PyPI](https://img.shields.io/pypi/v/pytest-qfield-e2e)](https://pypi.org/project/pytest-qfield-e2e)
+- [qfield-mcp](components/qfield-mcp/README.md): an MCP server that lets agents drive a real QField app.
+  [![PyPI](https://img.shields.io/pypi/v/qfield-mcp)](https://pypi.org/project/qfield-mcp)

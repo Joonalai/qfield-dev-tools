@@ -6,6 +6,7 @@ on:
     paths:
       - 'components/qfield-driver/**'
       - 'components/pytest-qfield-e2e/**'
+      - 'components/qfield-mcp/**'
       - 'components/qfield-fetch/**'
       - 'components/pytest-qfield/test/data/**'
       - '.github/workflows/e2e-tests.yml'
@@ -15,6 +16,7 @@ on:
     paths:
       - 'components/qfield-driver/**'
       - 'components/pytest-qfield-e2e/**'
+      - 'components/qfield-mcp/**'
       - 'components/qfield-fetch/**'
       - 'components/pytest-qfield/test/data/**'
       - '.github/workflows/e2e-tests.yml'
@@ -60,3 +62,5 @@ jobs:
         env:
           QFIELD_VERSION: ${{ matrix.qfield-version }}
         run: uv run --package pytest-qfield-e2e --all-extras --all-groups pytest -v -m "not qfieldcloud" components/pytest-qfield-e2e/test
+      - name: Run MCP tests
+        run: uv run --package qfield-mcp --all-extras --all-groups pytest -v components/qfield-mcp/test
