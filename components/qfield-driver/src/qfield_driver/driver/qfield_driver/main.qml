@@ -59,10 +59,36 @@ Item {
     return hits;
   }
 
+  // Depth first search over everything an object holds: visual children,
+  // non-visual data such as popups, and popup contents.
+  function _pqfSearch(root, test) {
+    const seen = [];
+    const search = (o, depth) => {
+      if (!o || depth > 60 || seen.indexOf(o) !== -1) {
+        return null;
+      }
+      seen.push(o);
+      if (test(o)) {
+        return o;
+      }
+      for (const key of ["data", "children", "contentChildren"]) {
+        const kids = o[key] || [];
+        for (let i = 0; i < kids.length; i++) {
+          const hit = search(kids[i], depth + 1);
+          if (hit) {
+            return hit;
+          }
+        }
+      }
+      return o.contentItem ? search(o.contentItem, depth + 1) : null;
+    };
+    return search(root, 0);
+  }
+
   // First item with an object name, in the scene and in the hosted plugin.
   function _pqfFindItem(name) {
     const test = i => i.objectName === name;
-    return _pqfWalk(_pqfScene(), test, 0) || _pqfWalk(_pqfHosted, test, 0) || _pqfFind(name);
+    return _pqfWalk(_pqfScene(), test, 0) || _pqfSearch(_pqfHosted, test) || _pqfFind(name);
   }
 
   function _pqfHost(path) {
@@ -70,7 +96,8 @@ Item {
       _pqfHosted.destroy();
       _pqfHosted = null;
     }
-    const component = Qt.createComponent("file://" + path + "?t=" + Date.now());
+    const url = "file://" + path.split("/").map(encodeURIComponent).join("/");
+    const component = Qt.createComponent(url + "?t=" + Date.now());
     if (component.status !== Component.Ready) {
       throw new Error(component.errorString());
     }
@@ -109,8 +136,8 @@ Item {
 
   function _pqfRun(command) {
     try {
-      const fn = new Function("iface", "find", "findItem", "walk", "walkAll", "scene", "state", "plugin", "driver", "qgisProject", "layerObserver", "pluginManager", "settings", "platformUtilities", "messageLogModel", "featureHistory", "flatLayerTree", "trackingModel", "LayerUtils", "GeometryUtils", "FeatureUtils", "StringUtils", "Theme", command.code);
-      const value = fn(iface, _pqfFind, _pqfFindItem, _pqfWalk, _pqfWalkAll, _pqfScene, _pqfState, _pqfHosted, qfieldDriver, qgisProject, layerObserver, pluginManager, settings, platformUtilities, messageLogModel, featureHistory, flatLayerTree, trackingModel, LayerUtils, GeometryUtils, FeatureUtils, StringUtils, Theme);
+      const fn = new Function("iface", "find", "findItem", "search", "walk", "walkAll", "scene", "state", "plugin", "driver", "qgisProject", "layerObserver", "pluginManager", "settings", "platformUtilities", "messageLogModel", "featureHistory", "flatLayerTree", "trackingModel", "LayerUtils", "GeometryUtils", "FeatureUtils", "StringUtils", "Theme", command.code);
+      const value = fn(iface, _pqfFind, _pqfFindItem, _pqfSearch, _pqfWalk, _pqfWalkAll, _pqfScene, _pqfState, _pqfHosted, qfieldDriver, qgisProject, layerObserver, pluginManager, settings, platformUtilities, messageLogModel, featureHistory, flatLayerTree, trackingModel, LayerUtils, GeometryUtils, FeatureUtils, StringUtils, Theme);
       _pqfSend(command.id, true, _pqfEncode(value));
     } catch (error) {
       _pqfSend(command.id, false, String(error) + (error && error.stack ? "\n" + error.stack : ""));
