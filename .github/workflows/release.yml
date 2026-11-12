@@ -42,3 +42,9 @@ jobs:
         with:
           component: pytest-qfield
           github_token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Release qfield-driver
+        uses: ./.github/actions/release-component
+        with:
+          component: qfield-driver
+          github_token: ${{ secrets.GITHUB_TOKEN }}

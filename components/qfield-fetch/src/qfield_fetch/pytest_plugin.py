@@ -16,7 +16,7 @@
 # You should have received a copy of the GNU General Public License
 # along with qfield-dev-tools.  If not, see <https://www.gnu.org/licenses/>.
 
-"""Pytest options that pytest-qfield and pytest-qfield-app share."""
+"""Pytest options that pytest-qfield and pytest-qfield-e2e share."""
 
 from __future__ import annotations
 

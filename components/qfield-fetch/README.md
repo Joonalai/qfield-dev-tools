@@ -1,7 +1,7 @@
 # qfield-fetch
 
 Downloads QField release AppImages, and QField and QFieldCloud sources, into one cache.
-[pytest-qfield](https://github.com/Joonalai/qfield-dev-tools/tree/main/components/pytest-qfield) and [pytest-qfield-app](https://github.com/Joonalai/qfield-dev-tools/tree/main/components/pytest-qfield-app)
+[pytest-qfield](https://github.com/Joonalai/qfield-dev-tools/tree/main/components/pytest-qfield) and [pytest-qfield-e2e](https://github.com/Joonalai/qfield-dev-tools/tree/main/components/pytest-qfield-e2e)
 fetch through it, and the command line manages the same cache.
 
 Each entry is fetched once, even by parallel processes such as pytest-xdist workers.
@@ -51,7 +51,7 @@ checkout = qfield_source("release-4_3", update=True)
 
 ## Pytest options
 
-The package registers options that pytest-qfield and pytest-qfield-app share:
+The package registers options that pytest-qfield and pytest-qfield-e2e share:
 
 | Option | Env | Ini |
 | --- | --- | --- |

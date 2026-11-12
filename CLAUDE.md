@@ -15,7 +15,7 @@ Shared skills live in `.agents/skills/`, managed by the [nlsfi agent-instruction
 
 ## Workspace layout
 
-The repo is a uv workspace. Every directory under `components/` is a member: `qfield-fetch` (downloads QField AppImages and sources, used by the others) and `pytest-qfield` (stub based plugin tests on QGIS).
+The repo is a uv workspace. Every directory under `components/` is a member: `qfield-fetch` (downloads QField AppImages and sources, used by the others), `pytest-qfield` (stub based plugin tests on QGIS) and `qfield-driver` (drives a real QField app from Python), `pytest-qfield-e2e` (pytest fixtures on the driver).
 
 - Not all components can be installed at the same time, so the root `pyproject.toml` never depends on a component. Sync one at a time: `uv sync --package <component> --all-groups`. Plain `--package` drops the root's `dev`/`lint` groups.
 - The root holds what all components share: the `dev` (pytest plugins) and `lint` groups, and the ruff and flake8 config. Package metadata, pytest config and semantic-release config live in each component's `pyproject.toml`.
@@ -26,7 +26,7 @@ The repo is a uv workspace. Every directory under `components/` is a member: `qf
 
 Each component releases on its own with python-semantic-release's `conventional-monorepo` parser, configured in the component's `pyproject.toml`.
 
-- A commit counts for a component when it changes files in the component's directory, or when its scope matches the component's `scope_prefix` (e.g. `feat(app): ...`).
+- A commit counts for a component when it changes files in the component's directory, or when its scope matches the component's `scope_prefix` (e.g. `feat(e2e): ...`).
 - Only `feat` (minor), `fix` and `build` (patch) commits release. Type root-only changes `chore:`/`ci:`/`docs:` so they release nothing.
 - Merge with rebase merge, not squash, so each commit keeps its own component.
 - `.github/workflows/release.yml` releases the components in dependency order. Add a step for each new component.
