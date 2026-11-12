@@ -1,0 +1,13 @@
+services:
+  nginx:
+    volumes:
+      - ./nginx-fix-resolver.sh:/nginx-fix-resolver.sh:ro
+    entrypoint: ["sh", "/nginx-fix-resolver.sh"]
+  worker_wrapper:
+    volumes: !override
+      - static_volume:/usr/src/app/staticfiles
+      - media_volume:/usr/src/app/mediafiles/
+      - transformation_grids:/transformation_grids
+      - ${PYTEST_QFIELDCLOUD_SOCKET}:/var/run/docker.sock
+      - custom_ca_certificates:/etc/ssl/custom_certs/:ro
+      - ${TMP_DIRECTORY}:/tmp

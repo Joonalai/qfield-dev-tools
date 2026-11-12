@@ -29,6 +29,7 @@ repository = "https://github.com/Joonalai/qfield-dev-tools"
 
 [project.entry-points.pytest11]
 pytest-qfield-e2e = "pytest_qfield_e2e.plugin"
+pytest-qfield-e2e-cloud = "pytest_qfield_e2e.cloud"
 
 [tool.uv.sources]
 qfield-driver = { workspace = true }
