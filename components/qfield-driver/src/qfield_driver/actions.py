@@ -44,6 +44,9 @@ EMBEDDED_FORM = (
     "walk(scene(), i => String(i).startsWith('FeatureForm_') && i.visible"
     " && i.embeddedLevel > 0, 0)"
 )
+# The form of a feature that digitizing just added, in a drawer of its own.
+OVERLAY_DRAWER = "find('overlayFeatureFormDrawer')"
+OVERLAY_FORM = f"{OVERLAY_DRAWER}.contentItem"
 SAVE_ICON = "ic_check_white_24dp"
 EDIT_ICON = "ic_edit_attributes"
 FORM_MENU_ICON = "ic_dot_menu_black_24dp"
@@ -326,9 +329,9 @@ def digitize_point(
     app.eval("iface.mainWindow().changeMode('digitize');")
     app.wait("return find('stateMachine').state === 'digitize'", 10)
     tap_map(app, *point)
-    app.wait("return find('overlayFeatureFormDrawer').opened", 15)
-    fill_and_confirm(app, "find('overlayFeatureFormDrawer').contentItem", label, value)
-    app.wait("return !find('overlayFeatureFormDrawer').opened", 15)
+    app.wait(f"return {OVERLAY_DRAWER}.opened", 15)
+    fill_and_confirm(app, OVERLAY_FORM, label, value)
+    app.wait(f"return !{OVERLAY_DRAWER}.opened", 15)
     app.eval("iface.mainWindow().changeMode('browse');")
 
 
@@ -359,6 +362,23 @@ def edit_in_form(
     """
     open_feature_form(app, layer, expression)
     fill_and_confirm(app, FEATURE_FORM, label, value)
+
+
+def current_form(app: QFieldApp) -> str:
+    """JS expression of the feature form that is open, a new feature's first."""
+    if app.eval(f"return !!{OVERLAY_DRAWER} && {OVERLAY_DRAWER}.opened"):
+        return OVERLAY_FORM
+    return FEATURE_FORM
+
+
+def save_open_form(app: QFieldApp) -> None:
+    """Save the feature form that is open, as its check button does."""
+    form = current_form(app)
+    if form == OVERLAY_FORM:
+        confirm_form(app, form)
+        app.wait(f"return !{OVERLAY_DRAWER}.opened", 15)
+    else:
+        save_form(app, form)
 
 
 def editor(form: str, label: str) -> str:
