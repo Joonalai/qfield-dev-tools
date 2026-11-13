@@ -22,6 +22,15 @@ The repo is a uv workspace. Every directory under `components/` is a member; `py
 - There is a single `uv.lock` for the whole workspace. Components with dependencies that can't be installed together must be declared in `[tool.uv] conflicts`.
 - The `.venv` must be created with `uv venv --system-site-packages`, using the same Python as QGIS, so the system QGIS bindings are visible. The system PyQt6 lacks QML bindings, so a PyQt6 wheel matching the system Qt minor version is installed on top (see `.github/workflows/tests.yml`). `uv sync` removes that wheel; reinstall it after syncing if PyQt6 imports fail.
 
+## Releases
+
+Each component releases on its own with python-semantic-release's `conventional-monorepo` parser, configured in the component's `pyproject.toml`.
+
+- A commit counts for a component when it changes files in the component's directory, or when its scope matches the component's `scope_prefix` (e.g. `feat(app): ...`).
+- Only `feat` (minor), `fix` and `build` (patch) commits release. Type root-only changes `chore:`/`ci:`/`docs:` so they release nothing.
+- Merge with rebase merge, not squash, so each commit keeps its own component.
+- `.github/workflows/release.yml` releases the components in dependency order. Add a step for each new component.
+
 ## Running tests and hooks
 
 Always run pytest offscreen so no windows pop over the developer's work. `.env` in the repository root is loaded automatically by `pytest-dotenv`. Components may need extra flags; see their `CLAUDE.md`.
