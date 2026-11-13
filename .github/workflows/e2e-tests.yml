@@ -8,6 +8,7 @@ on:
       - 'components/pytest-qfield-e2e/**'
       - 'components/qfield-mcp/**'
       - 'components/qfield-fetch/**'
+      - '.github/actions/setup-qfield-e2e/**'
       - 'components/pytest-qfield/test/data/**'
       - '.github/workflows/e2e-tests.yml'
       - 'uv.lock'
@@ -18,6 +19,7 @@ on:
       - 'components/pytest-qfield-e2e/**'
       - 'components/qfield-mcp/**'
       - 'components/qfield-fetch/**'
+      - '.github/actions/setup-qfield-e2e/**'
       - 'components/pytest-qfield/test/data/**'
       - '.github/workflows/e2e-tests.yml'
       - 'uv.lock'
@@ -25,14 +27,6 @@ on:
     # Catch a new QField release that breaks the `latest` tests early.
     - cron: '17 3 * * *'
   workflow_dispatch:
-
-env:
-  # The AppImage takes graphics, font and xcb libraries from the system.
-  APP_PACKAGES: >-
-    xvfb ca-certificates libfontconfig1 libegl1 libopengl0 libgl1 libglx-mesa0
-    libxkbcommon-x11-0 libxcb-cursor0 libxcb-icccm4 libxcb-image0 libxcb-keysyms1
-    libxcb-randr0 libxcb-render-util0 libxcb-shape0 libxcb-xinerama0 libxcb-xkb1
-    libdbus-1-3
 
 permissions:
   contents: read
@@ -46,21 +40,12 @@ jobs:
       fail-fast: false
     steps:
       - uses: actions/checkout@v6
-      - uses: astral-sh/setup-uv@v6
-      - name: Install Xvfb
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y $APP_PACKAGES
-      - uses: actions/cache@v4
+      - uses: ./.github/actions/setup-qfield-e2e
         with:
-          path: ~/.cache/qfield-fetch/appimage
-          key: qfield-${{ matrix.qfield-version }}-${{ github.run_id }}
-          restore-keys: qfield-${{ matrix.qfield-version }}-
+          qfield-version: ${{ matrix.qfield-version }}
       - name: Run driver tests
         run: uv run --package qfield-driver --all-extras --all-groups pytest -v components/qfield-driver/test
       - name: Run e2e tests
-        env:
-          QFIELD_VERSION: ${{ matrix.qfield-version }}
         run: uv run --package pytest-qfield-e2e --all-extras --all-groups pytest -v -m "not qfieldcloud" components/pytest-qfield-e2e/test
       - name: Run MCP tests
         run: uv run --package qfield-mcp --all-extras --all-groups pytest -v components/qfield-mcp/test

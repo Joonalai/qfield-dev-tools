@@ -37,6 +37,9 @@ No custom QField build is needed, the driver runs the binary users run.
   Without `/dev/video*` QField starts directly, as in containers and CI.
 - For QFieldCloud: docker or rootless podman with `docker compose`, and `git`
 
+On GitHub, the [setup-qfield-e2e](https://github.com/Joonalai/qfield-dev-tools/tree/main/.github/actions/setup-qfield-e2e)
+action installs these on an Ubuntu runner and caches the AppImages.
+
 ## Usage
 
 ```bash

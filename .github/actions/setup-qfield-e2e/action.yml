@@ -1,0 +1,47 @@
+name: Set up QField app tests
+description: >
+  Prepare an Ubuntu runner for pytest-qfield-e2e, qfield-driver or qfield-mcp. Installs Xvfb
+  and the system libraries the QField AppImage does not bundle, sets up uv and caches the
+  qfield-fetch AppImages between runs. Docker is left as the runner has it, for QFieldCloud.
+
+inputs:
+  qfield-version:
+    description: >
+      QField release to cache, exported as QFIELD_VERSION. Empty keeps it unset, the tests
+      then use their default release.
+    default: ""
+  python-version:
+    description: Python for uv to use. Empty lets uv pick, the runner's Python on GitHub.
+    default: ""
+
+runs:
+  using: composite
+  steps:
+    - name: Install Xvfb and the AppImage's system libraries
+      shell: bash
+      run: |
+        sudo=$([ "$(id -u)" = 0 ] || echo sudo)
+        $sudo apt-get update
+        $sudo apt-get install -y \
+          xvfb ca-certificates git libfontconfig1 libegl1 libopengl0 libgl1 libglx-mesa0 \
+          libxkbcommon-x11-0 libxcb-cursor0 libxcb-icccm4 libxcb-image0 libxcb-keysyms1 \
+          libxcb-randr0 libxcb-render-util0 libxcb-shape0 libxcb-xinerama0 libxcb-xkb1 \
+          libdbus-1-3
+
+    - uses: astral-sh/setup-uv@v6
+      with:
+        python-version: ${{ inputs.python-version }}
+
+    - name: Export the QField version
+      if: inputs.qfield-version != ''
+      shell: bash
+      env:
+        QFIELD_VERSION: ${{ inputs.qfield-version }}
+      run: echo "QFIELD_VERSION=$QFIELD_VERSION" >> "$GITHUB_ENV"
+
+    # The run id in the key saves a new entry each run, so `latest` follows releases.
+    - uses: actions/cache@v4
+      with:
+        path: ~/.cache/qfield-fetch/appimage
+        key: qfield-appimage-${{ inputs.qfield-version || 'default' }}-${{ github.run_id }}
+        restore-keys: qfield-appimage-${{ inputs.qfield-version || 'default' }}-

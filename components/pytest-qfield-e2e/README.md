@@ -93,6 +93,27 @@ A failing test gets a section per device in its report: the newest message log
 lines, the log tail and a screenshot path. No screenshot is taken while a camera
 view is open.
 
+### GitHub Actions
+
+The `setup-qfield-e2e` action installs Xvfb and the AppImage's system libraries on an
+Ubuntu runner, sets up uv and caches the AppImages between runs. Input `python-version`
+picks the Python for uv. Pin the action to a commit SHA.
+
+```yaml
+jobs:
+  test:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v6
+      - uses: Joonalai/qfield-dev-tools/.github/actions/setup-qfield-e2e@<sha>
+        with:
+          qfield-version: 4.2.9
+      - run: uv run pytest
+```
+
+Run it on the runner itself, not in a container: the QFieldCloud fixtures start the
+stack with the runner's docker.
+
 ### Faster runs
 
 - `--qfield-app-reuse` (ini `qfield_app_reuse = true`) keeps each device running
