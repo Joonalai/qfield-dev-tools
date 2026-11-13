@@ -39,7 +39,7 @@ def js_directory(data_path: "Path") -> "Path":
     return js_directory
 
 
-def test_load_js_function(qfield_bot: "QFieldBot", js_directory: "Path"):
+def test_load_js_function(qfield_bot: "QFieldBot", js_directory: "Path") -> None:
     js_object = qfield_bot.load_js_function(
         js_directory / "jslogic.js",
         "logHello",
@@ -55,7 +55,7 @@ def test_load_js_function(qfield_bot: "QFieldBot", js_directory: "Path"):
 
 def test_load_js_function_with_two_params(
     qfield_bot: "QFieldBot", js_directory: "Path"
-):
+) -> None:
     js_object = qfield_bot.load_js_function(
         js_directory / "jslogic.js",
         "sum",
@@ -73,7 +73,7 @@ def test_qgis_project_map_layers_by_name(
     qgs_project_stub: "QgsProjectStub",
     js_directory: "Path",
     subtests: "SubTests",
-):
+) -> None:
     js_object = qfield_bot.load_js_function(
         js_directory / "jslogic.js",
         "getLayer",

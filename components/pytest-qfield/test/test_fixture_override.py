@@ -59,7 +59,7 @@ def qfield_string_utils_stub() -> QFieldStringUtilsStub:
 # Helpers
 # ---------------------------------------------------------------------------
 @pytest.fixture
-def load_simple_plugin(qfield_bot: "QFieldBot", data_path: "Path"):
+def load_simple_plugin(qfield_bot: "QFieldBot", data_path: "Path") -> None:
     qfield_bot.load_plugin(
         data_path / "simple_plugin" / "main.qml", raise_if_warnings=True
     )
@@ -70,7 +70,7 @@ def load_simple_plugin(qfield_bot: "QFieldBot", data_path: "Path"):
 # 3. Test that the overridden stub is used by QML
 # ---------------------------------------------------------------------------
 @pytest.mark.usefixtures("load_simple_plugin")
-def test_overridden_string_utils_is_used_by_qml(qfield_bot: "QFieldBot"):
+def test_overridden_string_utils_is_used_by_qml(qfield_bot: "QFieldBot") -> None:
     """The simple_plugin calls StringUtils.createUuid() on button click."""
     button = qfield_bot.get_item("pluginButton")
     qfield_bot.click_item(button)

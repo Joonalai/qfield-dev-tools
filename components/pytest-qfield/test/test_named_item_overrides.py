@@ -29,6 +29,7 @@ from pytest_qfield.stub_interface.qfield_stubs import (
 if TYPE_CHECKING:
     from pathlib import Path
 
+    from PyQt6.QtCore import QObject
     from qgis.core import QgsVectorLayer
 
     from pytest_qfield.qfieldbot import QFieldBot
@@ -50,7 +51,7 @@ def load_stub_plugin(
     data_path: "Path",
     layer_points: "QgsVectorLayer",
     qgs_project_stub: "QgsProjectStub",
-):
+) -> None:
     qfield_bot.show_window()
     qfield_bot.load_plugin(
         data_path / "stub_tester_plugin" / "main.qml",
@@ -64,7 +65,7 @@ def load_stub_plugin(
 
 
 @pytest.mark.usefixtures("load_stub_plugin")
-def test_position_source_can_be_overridden_via_fixture(qfield_bot: "QFieldBot"):
+def test_position_source_can_be_overridden_via_fixture(qfield_bot: "QFieldBot") -> None:
     qfield_bot.click_item(qfield_bot.get_item("test_position_source"))
     assert qfield_bot.iface.logged_messages == [
         "positionSource active: true",
@@ -77,7 +78,7 @@ def test_named_item_lookup_does_not_transfer_ownership_to_qml(
     qfield_bot: "QFieldBot",
     tmp_path: "Path",
     qfield_geometry_highlighter_stub: "QFieldGeometryHighlighterStub",
-):
+) -> None:
     """Finding the highlighter by object name must keep ``CppOwnership``.
 
     Reaching it through ``iface.findItemByObjectName`` must not change its
@@ -111,7 +112,7 @@ def feature_form_driver(
     tmp_path: "Path",
     layer_points: "QgsVectorLayer",
     qgs_project_stub: "QgsProjectStub",
-):
+) -> tuple["QObject", "QgsVectorLayer"]:
     """Drive ``featureForm`` through the canonical plugin pattern.
 
     Grab via ``iface.findItemByObjectName('featureForm')``, navigate to a
@@ -137,9 +138,9 @@ Item {
 
 
 def test_feature_list_form_records_canonical_plugin_pattern(
-    feature_form_driver,
+    feature_form_driver: tuple["QObject", "QgsVectorLayer"],
     qfield_feature_list_form_stub: QFieldFeatureListFormStub,
-):
+) -> None:
     root, _layer = feature_form_driver
     root.open("id = '42'", "FeatureFormEdit")
 
@@ -166,7 +167,7 @@ def test_feature_list_form_can_be_overridden_via_fixture(
     tmp_path: "Path",
     layer_points: "QgsVectorLayer",
     qgs_project_stub: "QgsProjectStub",
-):
+) -> None:
     custom = _RecordingFeatureListFormStub()
     # Same effect as redefining the fixture in conftest: swap the registered
     # named item before any QML loads. Tests in user repos override by

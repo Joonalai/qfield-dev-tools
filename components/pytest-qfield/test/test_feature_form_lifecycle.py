@@ -37,7 +37,7 @@ def test_open_feature_form_view_makes_form_visible_and_sets_state(
     qfield_bot: "QFieldBot",
     layer_points: "QgsVectorLayer",
     qfield_feature_list_form_stub: "QFieldFeatureListFormStub",
-):
+) -> None:
     qfield_bot.open_feature_form(layer_points, 42, mode="view")
 
     assert qfield_feature_list_form_stub.visible is True
@@ -54,7 +54,7 @@ def test_open_feature_form_edit_sets_edit_state(
     qfield_bot: "QFieldBot",
     layer_points: "QgsVectorLayer",
     qfield_feature_list_form_stub: "QFieldFeatureListFormStub",
-):
+) -> None:
     qfield_bot.open_feature_form(layer_points, 1, mode="edit")
 
     assert qfield_feature_list_form_stub.visible is True
@@ -64,7 +64,7 @@ def test_open_feature_form_edit_sets_edit_state(
 def test_open_feature_form_rejects_unknown_mode(
     qfield_bot: "QFieldBot",
     layer_points: "QgsVectorLayer",
-):
+) -> None:
     with pytest.raises(ValueError, match="Unknown feature form mode 'bogus'"):
         qfield_bot.open_feature_form(layer_points, 1, mode="bogus")
 
@@ -73,7 +73,7 @@ def test_close_forms_hides_feature_form(
     qfield_bot: "QFieldBot",
     layer_points: "QgsVectorLayer",
     qfield_feature_list_form_stub: "QFieldFeatureListFormStub",
-):
+) -> None:
     qfield_bot.open_feature_form(layer_points, 1, mode="view")
     qfield_bot.close_forms()
 
@@ -85,7 +85,7 @@ def test_open_overlay_form_sets_opened_and_records_feature(
     qfield_bot: "QFieldBot",
     layer_points: "QgsVectorLayer",
     qfield_overlay_feature_form_drawer_stub: "QFieldOverlayFeatureFormDrawerStub",
-):
+) -> None:
     qfield_bot.open_overlay_form(layer_points, 7)
 
     assert qfield_overlay_feature_form_drawer_stub.opened is True
@@ -104,7 +104,7 @@ def test_form_lifecycle_drives_qml_binding(
     tmp_path: "Path",
     layer_points: "QgsVectorLayer",
     qgs_project_stub: "QgsProjectStub",
-):
+) -> None:
     """A plugin binding `aFormIsOpen` to both form stubs must follow the bot.
 
     As the myplugin plugin does, the binding must flip as the bot opens and

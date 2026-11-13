@@ -31,7 +31,7 @@ if TYPE_CHECKING:
 @pytest.mark.usefixtures("load_simple_plugin")
 def test_qfield_bot_should_load_plugin(
     qfield_bot: "QFieldBot", subtests: "SubTests", mock_uuid_value: "MagicMock"
-):
+) -> None:
     with subtests.test("button can be clicked"):
         button = qfield_bot.get_item("pluginButton")
         qfield_bot.click_item(button)
@@ -51,7 +51,7 @@ def test_qfield_bot_should_load_plugin(
 )
 def test_qfield_bot_should_open_project_file(
     qfield_bot: "QFieldBot", qgs_project_stub: "QgsProjectStub"
-):
+) -> None:
     assert qfield_bot.iface.logged_messages == ["Project load ended"]
     assert len(qgs_project_stub.mapLayersByName("points")) == 1
     osm_layers = qgs_project_stub.mapLayersByName("OpenStreetMap")
