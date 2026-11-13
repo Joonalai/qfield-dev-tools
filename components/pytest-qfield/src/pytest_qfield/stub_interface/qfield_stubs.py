@@ -268,7 +268,7 @@ class QFieldLayerUtilsStub(QObject):
         if deleted and (flush_buffer or not was_editing):
             # QGS201 misfires once QgsProject is imported in this module — the
             # checker matches the bare method name, but this is a layer commit.
-            layer.qgis_layer.commitChanges()  # noqa: QGS201, QGS202
+            return layer.qgis_layer.commitChanges()  # noqa: QGS201, QGS202
         return deleted
 
     @pyqtSlot(QObject, str, result=QObject)

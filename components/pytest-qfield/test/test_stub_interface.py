@@ -34,6 +34,7 @@ from pytest_qfield.stub_interface.qfield_stubs import (
 if TYPE_CHECKING:
     from pathlib import Path
 
+    from pytest_mock import MockerFixture
     from qgis.core import QgsVectorLayer
     from qgis.gui import QgsMapCanvas
 
@@ -423,3 +424,19 @@ def test_delete_feature_flushes_open_edit_session_when_requested(
     assert deleted is True
     assert fid not in layer_points.allFeatureIds()
     assert not layer_points.isEditable()
+
+
+def test_delete_feature_returns_false_when_commit_fails(
+    layer_points: "QgsVectorLayer",
+    qgs_project_stub: "QgsProjectStub",
+    qfield_layer_utils_stub: "QFieldLayerUtilsStub",
+    mocker: "MockerFixture",
+) -> None:
+    assert qgs_project_stub.qgis_project.addMapLayer(layer_points)
+    [layer_stub] = qgs_project_stub.mapLayersByName("points")
+    fid = layer_points.allFeatureIds()[0]
+    mocker.patch("qgis.core.QgsVectorLayer.commitChanges", return_value=False)
+
+    deleted = qfield_layer_utils_stub.deleteFeature(qgs_project_stub, layer_stub, fid)
+
+    assert deleted is False
