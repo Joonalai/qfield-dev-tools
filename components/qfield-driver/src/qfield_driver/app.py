@@ -23,14 +23,21 @@ from __future__ import annotations
 import json
 import logging
 import os
+import queue
 import shutil
 import subprocess
+import threading
 import time
 from pathlib import Path
 from typing import Any, Self
 
 from qfield_driver.bridge import Bridge
-from qfield_driver.display import Pointer, start_xvfb, terminate
+from qfield_driver.display import (
+    Pointer,
+    kill_with_parent,
+    start_xvfb,
+    terminate,
+)
 from qfield_driver.positioning import NmeaServer
 
 LOGGER = logging.getLogger(__name__)
@@ -46,6 +53,12 @@ NO_CAMERAS = (
     'for d in /dev/video*; do [ -e "$d" ] || continue; '
     'mount --bind /dev/null "$d" || exit 3; done; exec "$@"'
 )
+UNSHARE_HINT = (
+    "\nHiding the cameras needs unprivileged user namespaces, which AppArmor"
+    " may restrict (sysctl kernel.apparmor_restrict_unprivileged_userns=0)."
+)
+# Views that show the host camera, never grab them.
+CAMERA_VIEWS = "/Camera|QRCodeReader|CodeReader/"
 DROPPED_ENV = (
     "WAYLAND_DISPLAY",
     "QT_QPA_PLATFORM",
@@ -135,9 +148,11 @@ class QFieldApp:
 
     :param app_plugins: App plugins to install and enable, by uuid
     :param settings: QField settings written before the start, see `seed_profile`
+    :param die_with_parent: Kill QField and Xvfb when the starting thread exits,
+        for callers that may be killed without cleanup
     """
 
-    def __init__(
+    def __init__(  # noqa: PLR0913 options are keyword-only
         self,
         app_run: Path,
         home: Path,
@@ -145,8 +160,10 @@ class QFieldApp:
         app_plugins: dict[str, Path] | None = None,
         settings: dict[str, object] | None = None,
         screen_size: tuple[int, int] = SCREEN_SIZE,
+        die_with_parent: bool = False,
     ) -> None:
         self._app_run = app_run
+        self._die_with_parent = die_with_parent
         self.home = home
         self.log = home.parent / f"{home.name}.log"
         self._app_plugins = app_plugins
@@ -154,11 +171,16 @@ class QFieldApp:
         self._screen_size = screen_size
         self._sequence = 0
         self._log_offset = 0
+        # Where this test's log starts on a reused app.
+        self._log_start = 0
         self._bridge = Bridge()
         self._process: subprocess.Popen[bytes] | None = None
         self._xvfb: subprocess.Popen[bytes] | None = None
         self._pointer: Pointer | None = None
         self._gnss: NmeaServer | None = None
+        self._eval_lock = threading.Lock()
+        self._hosted: Path | None = None
+        self._reload_copy: Path | None = None
 
     def __enter__(self) -> Self:
         try:
@@ -173,7 +195,9 @@ class QFieldApp:
         seed_profile(
             self.home, self._bridge.endpoint, self._app_plugins, self._settings
         )
-        self._xvfb, display_number = start_xvfb(*self._screen_size)
+        self._xvfb, display_number = start_xvfb(
+            *self._screen_size, die_with_parent=self._die_with_parent
+        )
         self._pointer = Pointer(display_number)
         env = {
             name: value for name, value in os.environ.items() if name not in DROPPED_ENV
@@ -200,12 +224,15 @@ class QFieldApp:
                 stdout=out,
                 stderr=subprocess.STDOUT,
                 start_new_session=True,
+                preexec_fn=kill_with_parent if self._die_with_parent else None,  # noqa: PLW1509 only calls prctl
             )
         deadline = time.monotonic() + START_TIMEOUT_S
         while not self._bridge.polled.wait(0.5):
             if self._process.poll() is not None or time.monotonic() > deadline:
                 tail = self.log_text()[-2000:]
                 msg = f"QField or its driver did not start:\n{tail}"
+                if command[0] == "unshare" and "unshare:" in tail:
+                    msg += UNSHARE_HINT
                 raise DriverError(msg)
         # Without a window manager nothing maximizes the window.
         width, height = self._screen_size
@@ -216,6 +243,19 @@ class QFieldApp:
 
     def __exit__(self, *_exc: object) -> None:
         self.close()
+
+    @property
+    def running(self) -> bool:
+        return self._process is not None and self._process.poll() is None
+
+    @property
+    def process_groups(self) -> dict[str, int]:
+        """Process group ids of QField and its Xvfb, both lead their group."""
+        return {
+            name: process.pid
+            for name, process in (("qfield", self._process), ("xvfb", self._xvfb))
+            if process is not None
+        }
 
     def close(self) -> None:
         if self._process is not None:
@@ -231,6 +271,9 @@ class QFieldApp:
             self._gnss.close()
             self._gnss = None
         self._bridge.close()
+        if self._reload_copy is not None:
+            shutil.rmtree(self._reload_copy, ignore_errors=True)
+            self._reload_copy = None
 
     # Code
 
@@ -245,9 +288,10 @@ class QFieldApp:
         `flatLayerTree`, `trackingModel`, `LayerUtils`, `GeometryUtils`,
         `FeatureUtils`, `StringUtils` and `Theme`.
         """
-        self._sequence += 1
-        command_id = self._sequence
-        self._bridge.commands.put({"id": command_id, "code": code})
+        with self._eval_lock:
+            self._sequence += 1
+            command_id = self._sequence
+            self._bridge.commands.put({"id": command_id, "code": code})
         deadline = time.monotonic() + timeout
         while time.monotonic() < deadline:
             result = self._bridge.results.pop(command_id, None)
@@ -292,10 +336,13 @@ class QFieldApp:
         return self.log_text()[self._log_offset :].splitlines()
 
     def wait_for_log(self, line: str, timeout: float = 30, count: int = 1) -> None:
-        """Wait until the log holds `line` at least `count` times."""
+        """Wait until the log holds `line` at least `count` times.
+
+        Lines are counted since the last `reset`.
+        """
         deadline = time.monotonic() + timeout
         while time.monotonic() < deadline:
-            if self.log_text().count(line) >= count:
+            if self.log_text()[self._log_start :].count(line) >= count:
                 return
             time.sleep(0.2)
         msg = f"{line!r} not in {self.log}"
@@ -339,12 +386,32 @@ class QFieldApp:
         created without a parent, but it keeps no handle a test could reach.
         """
         self.eval(f"return driver._pqfHost({json.dumps(str(main_qml))})")
+        self._hosted = main_qml
+
+    def reload_plugin(self) -> None:
+        """Host a fresh copy of the hosted plugin's directory.
+
+        This way edits to any of its files load, as QML caches imported files by URL.
+        """
+        if self._hosted is None:
+            msg = "No hosted plugin to reload"
+            raise DriverError(msg)
+        hosted = self._hosted
+        previous = self._reload_copy
+        copy = self.home.parent / f"{self.home.name}-reload-{time.time_ns()}"
+        shutil.copytree(hosted.parent, copy)
+        self.host_plugin(copy / hosted.name)
+        self._hosted = hosted
+        self._reload_copy = copy
+        if previous is not None:
+            shutil.rmtree(previous, ignore_errors=True)
 
     def unhost_plugin(self) -> None:
         self.eval(
             "if (driver._pqfHosted) driver._pqfHosted.destroy();"
             "driver._pqfHosted = null;"
         )
+        self._hosted = None
 
     def plugin_property(self, name: str) -> Any:  # noqa: ANN401
         return self.eval(f"return plugin[{json.dumps(name)}]")
@@ -389,13 +456,107 @@ class QFieldApp:
 
     # Pictures
 
-    def screenshot(self, path: Path) -> Path:
-        """Save a grab of the whole window."""
-        self.eval(
-            "state.saved = null; scene().grabToImage("
-            f"result => state.saved = result.saveToFile({json.dumps(str(path))}));"
+    def camera_open(self) -> bool:
+        """Whether a view showing the camera is open."""
+        return bool(
+            self.eval(
+                f"return walkAll(scene(), i => i.visible && {CAMERA_VIEWS}"
+                ".test(String(i)), 0).length > 0"
+            )
         )
+
+    def screenshot(self, path: Path, item: str = "scene()", scale: float = 1) -> Path:
+        """Save a grab of the whole window, or of the item a JS expression gives.
+
+        :param scale: Size factor, below 1 for smaller files
+        """
+        self.eval(f"""
+          const item = {item};
+          state.saved = null;
+          item.grabToImage(
+            result => state.saved = result.saveToFile({json.dumps(str(path))}),
+            Qt.size(Math.max(1, item.width * {scale}),
+                    Math.max(1, item.height * {scale})));
+        """)
         if not self.wait("return state.saved !== null && [state.saved]", 10)[0]:
             msg = f"Could not save a screenshot to {path}"
             raise DriverError(msg)
         return path
+
+    # Reuse
+
+    def reset(self) -> None:
+        """Bring a running app back near its started state for another test.
+
+        The plugin is unhosted, popups closed, project cleared, position lost,
+        message log cleared and `state` emptied. Settings and app plugins stay.
+        """
+        # Commands of evals that timed out must not run in the next test.
+        with self._eval_lock:
+            while True:
+                try:
+                    self._bridge.commands.get_nowait()
+                except queue.Empty:
+                    break
+            self._bridge.results.clear()
+        self.unhost_plugin()
+        if self._gnss is not None:
+            self.lose_position()
+        self.eval("""
+          for (let n = 0; n < 20; n++) {
+            const popup = search(iface.mainWindow(),
+              i => i.opened === true && typeof i.close === 'function');
+            if (!popup) break;
+            popup.close();
+          }
+          if (find('stateMachine').state !== 'browse') {
+            iface.mainWindow().changeMode('browse');
+          }
+          iface.clearProject();
+          messageLogModel.clear();
+          // Hooks keep using the same object, so keep their flags.
+          for (const key of Object.keys(state)) {
+            if (!key.endsWith('Hooked')) delete state[key];
+          }
+        """)
+        self.settle()
+        self.mark_log()
+        self._log_start = self._log_offset
+
+    # Diagnostics
+
+    def diagnose(self, directory: Path, name: str) -> str:
+        """Save a screenshot and describe the app's state, for a failure report."""
+        lines = [f"log: {self.log}"]
+        if not self.running:
+            lines.append("QField is not running")
+        else:
+            lines += self._diagnose_live(directory, name)
+        tail = self.log_text().splitlines()[-30:]
+        return "\n".join([*lines, "log tail:", *tail])
+
+    def _diagnose_live(self, directory: Path, name: str) -> list[str]:
+        lines: list[str] = []
+        try:
+            messages = self.eval(
+                """
+                const rows = [];
+                const model = messageLogModel;
+                for (let r = 0; r < Math.min(model.rowCount(), 15); r++) {
+                  const index = model.index(r, 0);
+                  rows.push(model.data(index, 0x0101) + ': '
+                    + model.data(index, 0x0100));
+                }
+                return rows;
+                """,
+                timeout=5,
+            )
+            lines += ["message log, newest first:", *messages]
+            if self.camera_open():
+                lines.append("no screenshot, a camera view is open")
+            else:
+                shot = self.screenshot(directory / f"{name}-failure.png")
+                lines.append(f"screenshot: {shot}")
+        except (DriverError, TimeoutError) as error:
+            lines.append(f"driver did not answer: {error}")
+        return lines
