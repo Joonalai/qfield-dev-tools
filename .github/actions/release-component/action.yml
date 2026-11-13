@@ -1,7 +1,10 @@
 # Adapted from https://github.com/nlsfi/pinta/blob/main/.github/actions/release-component/action.yml
 
 name: Release component
-description: Release one component with python-semantic-release and publish it to PyPI.
+description: >
+  Release one component with python-semantic-release and publish it to PyPI. After a release,
+  the version requirements of the components that depend on it are raised in a build(deps)
+  commit, so the dependents get released as well.
 
 inputs:
   component:
@@ -38,3 +41,23 @@ runs:
       shell: bash
       working-directory: components/${{ inputs.component }}
       run: uv publish dist/*
+
+    # One build(deps) commit per dependent, the changed path makes it releasable for that dependent only
+    - name: Raise version requirements of dependents
+      if: steps.release.outputs.released == 'true'
+      shell: bash
+      env:
+        COMPONENT: ${{ inputs.component }}
+        VERSION: ${{ steps.release.outputs.version }}
+      run: |
+        set -euo pipefail
+        git config user.name "semantic-release"
+        git config user.email "semantic-release"
+        # A separate assignment, so that set -e stops on a failing script
+        dependents=$(python3 scripts/bump_dependents.py "$COMPONENT" "$VERSION")
+        for dependent in $dependents; do
+          uv lock
+          git add "components/$dependent/pyproject.toml" uv.lock
+          git commit -m "build(deps): require $COMPONENT >=$VERSION in $dependent"
+        done
+        git push
