@@ -166,6 +166,7 @@ the stack's own mkcert authority, `stack.ca_certificate`. HTTPS is on port 8543.
 
 ```bash
 qfield-driver-cloud ref               # what `hosted` resolves to
+qfield-driver-cloud ref --check v26.30  # exit 1 when a pinned tag is not hosted
 qfield-driver-cloud up --ref latest   # build and start
 qfield-driver-cloud prune             # remove stacks of older releases
 qfield-driver-cloud down
