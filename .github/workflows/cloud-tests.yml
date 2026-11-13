@@ -1,0 +1,45 @@
+name: Cloud tests
+
+# The stack build is slow, so pull requests run it only when cloud code changes.
+on:
+  pull_request:
+    branches: [ main ]
+    paths:
+      - 'components/qfield-driver/src/qfield_driver/cloud/**'
+      - 'components/qfield-driver/src/qfield_driver/actions.py'
+      - 'components/pytest-qfield-e2e/src/pytest_qfield_e2e/cloud.py'
+      - 'components/pytest-qfield-e2e/test/conftest.py'
+      - 'components/pytest-qfield-e2e/test/test_cloud.py'
+      - 'components/qfield-fetch/src/**'
+      - '.github/workflows/cloud-tests.yml'
+  schedule:
+    # The stack follows app.qfield.cloud, catch a new QFieldCloud release early.
+    - cron: '17 3 * * *'
+  workflow_dispatch:
+
+env:
+  # The AppImage takes graphics, font and xcb libraries from the system.
+  APP_PACKAGES: >-
+    xvfb ca-certificates libfontconfig1 libegl1 libopengl0 libgl1 libglx-mesa0
+    libxkbcommon-x11-0 libxcb-cursor0 libxcb-icccm4 libxcb-image0 libxcb-keysyms1
+    libxcb-randr0 libxcb-render-util0 libxcb-shape0 libxcb-xinerama0 libxcb-xkb1
+    libdbus-1-3
+
+permissions:
+  contents: read
+
+jobs:
+  cloud:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v6
+      - uses: astral-sh/setup-uv@v6
+      - name: Install Xvfb
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y $APP_PACKAGES
+      - name: Run cloud tests against the hosted QFieldCloud release
+        run: >
+          uv run --package pytest-qfield-e2e --all-extras --all-groups pytest -v
+          -m qfieldcloud --qfieldcloud-down components/pytest-qfield-e2e/test

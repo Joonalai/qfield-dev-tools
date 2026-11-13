@@ -20,7 +20,7 @@ on:
       - '.github/workflows/e2e-tests.yml'
       - 'uv.lock'
   schedule:
-    # QFieldCloud follows app.qfield.cloud, catch a new release early.
+    # Catch a new QField release that breaks the `latest` tests early.
     - cron: '17 3 * * *'
   workflow_dispatch:
 
@@ -60,18 +60,3 @@ jobs:
         env:
           QFIELD_VERSION: ${{ matrix.qfield-version }}
         run: uv run --package pytest-qfield-e2e --all-extras --all-groups pytest -v -m "not qfieldcloud" components/pytest-qfield-e2e/test
-
-  cloud:
-    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
-    runs-on: ubuntu-24.04
-    steps:
-      - uses: actions/checkout@v6
-      - uses: astral-sh/setup-uv@v6
-      - name: Install Xvfb
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y $APP_PACKAGES
-      - name: Run cloud tests against the hosted QFieldCloud release
-        run: >
-          uv run --package pytest-qfield-e2e --all-extras --all-groups pytest -v
-          -m qfieldcloud --qfieldcloud-down components/pytest-qfield-e2e/test
