@@ -5,6 +5,7 @@ on:
     branches: [ main ]
     paths:
       - 'components/pytest-qfield/**'
+      - '.github/actions/setup-pytest-qfield/**'
       - 'components/qfield-fetch/**'
       - 'pyproject.toml'
       - '.github/workflows/tests.yml'
@@ -13,6 +14,7 @@ on:
     branches: [ main ]
     paths:
       - 'components/pytest-qfield/**'
+      - '.github/actions/setup-pytest-qfield/**'
       - 'components/qfield-fetch/**'
       - 'pyproject.toml'
       - '.github/workflows/tests.yml'
@@ -43,24 +45,11 @@ jobs:
     steps:
       - uses: actions/checkout@v6
 
-      - name: Install venv
-        run: |
-          apt update
-          apt install -y python3-venv curl git
-
-      - name: Create virtualenv and install dependencies
-        run: |
-          python3 -m venv --system-site-packages .venv
-          .venv/bin/pip3 install -q -U uv
-          .venv/bin/uv sync --package pytest-qfield --all-groups
-          # The system PyQt6 lacks QML bindings and the PyQt6 wheel must bundle
-          # the same Qt minor version as the system, as QGIS uses its private API
-          QT_MINOR=$(python3 -c "from PyQt6.QtCore import QT_VERSION_STR; print(QT_VERSION_STR.rsplit('.', 1)[0])")
-          .venv/bin/uv pip install --python .venv/bin/python "PyQt6==${QT_MINOR}.*"
+      - uses: ./.github/actions/setup-pytest-qfield
+        with:
+          install: uv sync --package pytest-qfield --all-groups
+          qfield-version: ${{ matrix.qfield-refs }}
 
       - name: Run tests
-        env:
-          QFIELD_VERSION: ${{ matrix.qfield-refs }}
-          QGIS_IN_CI: 1
         run: |
-          .venv/bin/uv run --package pytest-qfield pytest -v --qgis_disable_gui components/pytest-qfield/test
+          uv run --package pytest-qfield pytest -v --qgis_disable_gui components/pytest-qfield/test

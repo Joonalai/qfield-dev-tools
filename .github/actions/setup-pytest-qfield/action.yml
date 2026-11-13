@@ -1,0 +1,73 @@
+name: Set up pytest-qfield
+description: >
+  Prepare a qgis/qgis container job for pytest-qfield. Creates a virtualenv that sees the
+  system QGIS, installs the project into it and adds the PyQt6 wheel with QML bindings that
+  matches the system Qt. The virtualenv's bin directory is put on PATH for later steps.
+
+inputs:
+  install:
+    description: >
+      Command that installs the project into the virtualenv, with uv on PATH. The PyQt6
+      wheel is added after it, because uv sync removes packages the lock file lacks.
+    default: uv sync --all-groups
+  venv:
+    description: Virtualenv to create, relative to the workspace.
+    default: .venv
+  qfield-version:
+    description: QField release or git ref, exported as QFIELD_VERSION. Empty keeps it unset.
+    default: ""
+
+outputs:
+  qt-version:
+    description: Qt minor version of the system QGIS, which the PyQt6 wheel matches.
+    value: ${{ steps.pyqt.outputs.qt-version }}
+
+runs:
+  using: composite
+  steps:
+    - name: Install system packages
+      shell: bash
+      run: |
+        sudo=$([ "$(id -u)" = 0 ] || echo sudo)
+        $sudo apt-get update
+        $sudo apt-get install -y python3-venv curl git
+
+    - name: Create the virtualenv
+      shell: bash
+      env:
+        VENV: ${{ inputs.venv }}
+      run: |
+        venv=$(realpath -m "$VENV")
+        /usr/bin/python3 -m venv --system-site-packages "$venv"
+        "$venv/bin/pip" install -q -U uv
+        echo "$venv/bin" >> "$GITHUB_PATH"
+        {
+          echo "VIRTUAL_ENV=$venv"
+          echo "UV_PROJECT_ENVIRONMENT=$venv"
+          # pytest-qgis runs QGIS without a display
+          echo "QGIS_IN_CI=1"
+        } >> "$GITHUB_ENV"
+
+    - name: Install the project
+      shell: bash
+      env:
+        INSTALL: ${{ inputs.install }}
+      run: |
+        eval "$INSTALL"
+
+    - name: Add PyQt6 with QML bindings
+      id: pyqt
+      shell: bash
+      run: |
+        # The system PyQt6 lacks QML bindings and the wheel must bundle the same Qt
+        # minor version as the system, as QGIS uses its private API.
+        qt_minor=$(/usr/bin/python3 -c "from PyQt6.QtCore import QT_VERSION_STR; print(QT_VERSION_STR.rsplit('.', 1)[0])")
+        "$VIRTUAL_ENV/bin/uv" pip install --python "$VIRTUAL_ENV/bin/python" "PyQt6==${qt_minor}.*"
+        echo "qt-version=$qt_minor" >> "$GITHUB_OUTPUT"
+
+    - name: Export the QField version
+      if: inputs.qfield-version != ''
+      shell: bash
+      env:
+        QFIELD_VERSION: ${{ inputs.qfield-version }}
+      run: echo "QFIELD_VERSION=$QFIELD_VERSION" >> "$GITHUB_ENV"

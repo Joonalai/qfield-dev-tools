@@ -256,6 +256,30 @@ qfield_source_dir = /absolute/path/to/QField
 
 The former `QFIELD_IMPORTS_DIR` / `qfield_imports_dir` names still work but are deprecated.
 
+### GitHub Actions
+
+Run the tests in a [qgis/qgis](https://hub.docker.com/r/qgis/qgis) container. The
+`setup-pytest-qfield` action creates a virtualenv that sees the system QGIS, runs your
+install command in it and adds the matching PyQt6 wheel. Pin the action to a commit SHA.
+
+```yaml
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    container:
+      image: qgis/qgis:latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: Joonalai/qfield-dev-tools/.github/actions/setup-pytest-qfield@<sha>
+        with:
+          install: uv sync --all-groups  # or: pip install -e . pytest-qfield
+          qfield-version: 4.2.9
+      - run: pytest --qgis_disable_gui
+```
+
+The virtualenv (input `venv`, default `.venv`) is on `PATH` for later steps, and
+`QGIS_IN_CI` is set so QGIS runs without a display.
+
 ## Development environment
 
 This project uses [uv](https://docs.astral.sh/uv/getting-started/installation/)

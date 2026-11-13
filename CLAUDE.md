@@ -30,6 +30,7 @@ Each component releases on its own with python-semantic-release's `conventional-
 - Only `feat` (minor), `fix` and `build` (patch) commits release. Type root-only changes `chore:`/`ci:`/`docs:` so they release nothing.
 - Merge with rebase merge, not squash, so each commit keeps its own component.
 - `.github/workflows/release.yml` releases the components in dependency order. Add a step for each new component.
+- `.github/actions/setup-pytest-qfield` and `setup-qfield-e2e` are used by other repositories, so treat their inputs as a public API. Our own workflows use them too.
 
 ## Running tests and hooks
 
