@@ -24,6 +24,7 @@ import argparse
 import logging
 from pathlib import Path
 
+from qfield_driver.appimage import default_cache_dir
 from qfield_driver.cloud.stack import (
     HOSTED,
     QFieldCloudStack,
@@ -36,7 +37,7 @@ def main() -> None:
     parser = argparse.ArgumentParser(prog="python -m qfield_driver.cloud")
     parser.add_argument("command", choices=("up", "down", "prune", "ref"))
     parser.add_argument("--ref", default=HOSTED, help="hosted, latest or a tag")
-    parser.add_argument("--cache-dir", type=Path, required=True)
+    parser.add_argument("--cache-dir", type=Path, default=default_cache_dir())
     args = parser.parse_args()
     logging.basicConfig(level=logging.INFO)
     ref = resolve_ref(args.ref)

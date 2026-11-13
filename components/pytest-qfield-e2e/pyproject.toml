@@ -16,7 +16,7 @@ classifiers = [
     "Operating System :: POSIX :: Linux",
 ]
 dependencies = [
-    "pytest",
+    "pytest>=8",
     "qfield-driver",
 ]
 
@@ -40,7 +40,6 @@ build-backend = "uv_build"
 
 [tool.uv.build-backend]
 module-name = "pytest_qfield_e2e"
-include = ["**/py.typed", "**/*.qml", "**/metadata.txt", "**/*.yml", "**/*.sh"]
 
 [tool.pytest.ini_options]
 # The QGIS based plugins import Qt on load, app tests need none of it.

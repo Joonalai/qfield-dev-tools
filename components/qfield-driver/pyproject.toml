@@ -15,11 +15,11 @@ classifiers = [
     "Operating System :: POSIX :: Linux",
 ]
 dependencies = [
-    "python-xlib",
+    "python-xlib>=0.33",
 ]
 
 [project.optional-dependencies]
-cloud = ["requests"]
+cloud = ["requests>=2.32", "urllib3>=2"]
 
 [project.urls]
 homepage = "https://github.com/Joonalai/qfield-dev-tools"
@@ -31,7 +31,6 @@ build-backend = "uv_build"
 
 [tool.uv.build-backend]
 module-name = "qfield_driver"
-include = ["**/py.typed", "**/*.qml", "**/metadata.txt", "**/*.yml", "**/*.sh"]
 
 [tool.pytest.ini_options]
 # The QGIS based plugins import Qt on load, these tests need none of it.

@@ -182,3 +182,19 @@ process is pointless, so disable them for app test runs.
 
 Each test starts its own QField, about 5 s on a laptop. Device logs are in
 `tmp_path/<device>.log`, and `qfield_app.screenshot(path)` saves the window.
+
+A failing test gets a section per device in its report: the newest message log
+lines, the log tail and a screenshot path. No screenshot is taken while a camera
+view is open.
+
+### Faster runs
+
+- `--qfield-app-reuse` (ini `qfield_app_reuse = true`) keeps each device running
+  and resets it between tests: plugin unhosted, popups closed, project cleared,
+  position lost, `state` emptied. A device is started again when the plugins or
+  settings differ. Settings a test changes stay, so keep it off for tests that
+  rely on a fresh profile.
+- `pytest-xdist` works, every device has its own display and ports. Workers
+  share one QFieldCloud stack and get their own users, `alice` becomes
+  `alice_gw1` through `worker_username`, which the cloud fixtures apply.
+  `--qfieldcloud-down` removes the stack once all workers are done.

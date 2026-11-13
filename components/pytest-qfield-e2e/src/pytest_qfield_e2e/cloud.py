@@ -23,7 +23,8 @@ from __future__ import annotations
 import os
 import time
 from contextlib import suppress
-from typing import TYPE_CHECKING
+from pathlib import Path
+from typing import TYPE_CHECKING, Any
 
 import pytest
 
@@ -31,13 +32,14 @@ from qfield_driver import actions
 from qfield_driver.cloud.stack import HOSTED, QFieldCloudStack, resolve_ref
 
 if TYPE_CHECKING:
-    from collections.abc import Callable, Iterator
-    from pathlib import Path
+    from collections.abc import Callable, Generator, Iterator
 
     from qfield_driver.app import QFieldApp
     from qfield_driver.cloud.client import QFieldCloudClient
 
 REF_ENV = "QFIELDCLOUD_REF"
+WORKER_ENV = "PYTEST_XDIST_WORKER"
+USED_STACK = pytest.StashKey[dict[str, Any]]()
 DEFAULT_PASSWORD = "pytest-qfield-123"  # noqa: S105 disposable local test stack
 
 
@@ -65,6 +67,50 @@ def pytest_configure(config: pytest.Config) -> None:
     )
 
 
+def worker_username(username: str) -> str:
+    """Return a username of this pytest-xdist worker, so workers never share a user.
+
+    One cloud token is valid on one device, parallel tests would log each
+    other out. Outside xdist names stay as they are.
+    """
+    worker = os.environ.get(WORKER_ENV)
+    if not worker or username.endswith(f"_{worker}"):
+        return username
+    return f"{username}_{worker}"
+
+
+def pytest_sessionfinish(session: pytest.Session) -> None:
+    """Remove the stack xdist workers used, once all of them are done."""
+    config = session.config
+    used = config.stash.get(USED_STACK, None)
+    if used and config.getoption("qfieldcloud_down") and not os.environ.get(WORKER_ENV):
+        QFieldCloudStack(used["ref"], Path(used["cache_dir"]), name=used["name"]).down()
+
+
+@pytest.hookimpl(optionalhook=True)
+def pytest_testnodedown(node: Any, error: object) -> None:  # noqa: ANN401, ARG001
+    """Hear from xdist workers which stack they used."""
+    output = getattr(node, "workeroutput", {})
+    if "qfieldcloud_stack" in output:
+        node.config.stash[USED_STACK] = output["qfieldcloud_stack"]
+
+
+@pytest.hookimpl(wrapper=True)
+def pytest_fixture_setup(
+    fixturedef: pytest.FixtureDef[Any], request: pytest.FixtureRequest
+) -> Generator[None, Any, Any]:
+    """Tell the xdist controller which stack a worker used, overrides included."""
+    result = yield
+    output = getattr(request.config, "workeroutput", None)
+    if fixturedef.argname == "qfieldcloud_stack" and output is not None:
+        output["qfieldcloud_stack"] = {
+            "ref": result.ref,
+            "cache_dir": str(result.cache_dir),
+            "name": result.name,
+        }
+    return result
+
+
 @pytest.fixture(scope="session")
 def qfieldcloud_ref(pytestconfig: pytest.Config) -> str:
     """Return the QFieldCloud tag under test, resolved from `hosted` or `latest`."""
@@ -83,14 +129,16 @@ def qfieldcloud_stack(
 ) -> Iterator[QFieldCloudStack]:
     """Start a local QFieldCloud, reused across sessions until removed.
 
-    Override to change ports or pass extra `.env` values.
+    Workers of pytest-xdist share it. Override to change ports or pass extra
+    `.env` values.
     """
     stack = QFieldCloudStack(qfieldcloud_ref, qfield_app_cache_dir)
     if port := pytestconfig.getini("qfieldcloud_https_port"):
         stack.https_port = int(port)
     stack.up()
     yield stack
-    if pytestconfig.getoption("qfieldcloud_down"):
+    # Under xdist the controller removes it once every worker is done.
+    if pytestconfig.getoption("qfieldcloud_down") and not os.environ.get(WORKER_ENV):
         stack.down()
 
 
@@ -98,7 +146,12 @@ def qfieldcloud_stack(
 def qfieldcloud_admin(qfieldcloud_stack: QFieldCloudStack) -> QFieldCloudClient:
     from qfield_driver.cloud.client import QFieldCloudClient  # noqa: PLC0415
 
-    return QFieldCloudClient(qfieldcloud_stack.url, *qfieldcloud_stack.admin)
+    username, password = qfieldcloud_stack.admin
+    if worker_username(username) != username:
+        # A login ends the user's other sessions, so each worker has its own.
+        username = worker_username(username)
+        qfieldcloud_stack.ensure_user(username, password, superuser=True)
+    return QFieldCloudClient(qfieldcloud_stack.url, username, password)
 
 
 @pytest.fixture(scope="session")
@@ -112,6 +165,7 @@ def qfieldcloud_user(
     from qfield_driver.cloud.client import QFieldCloudClient  # noqa: PLC0415
 
     def user(username: str, password: str = DEFAULT_PASSWORD) -> QFieldCloudClient:
+        username = worker_username(username)
         qfieldcloud_stack.ensure_user(username, password)
         return QFieldCloudClient(qfieldcloud_stack.url, username, password)
 
@@ -138,7 +192,7 @@ def qfieldcloud_project(
         )
         created.append(project_id)
         for username in collaborators:
-            qfieldcloud_admin.add_collaborator(project_id, username)
+            qfieldcloud_admin.add_collaborator(project_id, worker_username(username))
         qfieldcloud_admin.upload(project_id, directory)
         qfieldcloud_admin.package(project_id)
         return project_id
@@ -167,6 +221,7 @@ def qfieldcloud_device(
         name: str | None = None,
         grant_plugin: bool = False,
     ) -> QFieldApp:
+        username = worker_username(username)
         app = qfield_app_factory(name or username)
         actions.login(app, qfieldcloud_stack.url, username, password)
         project_file = actions.download_project(app, project_id)

@@ -25,6 +25,7 @@ project, images and volumes, and `down_stale` removes the older ones.
 
 from __future__ import annotations
 
+import fcntl
 import json
 import logging
 import os
@@ -316,7 +317,16 @@ class QFieldCloudStack:
         raise StackError(msg)
 
     def up(self) -> None:
-        """Build and start the stack unless it already answers. Idempotent."""
+        """Build and start the stack unless it already answers.
+
+        Idempotent, and safe from parallel processes such as pytest-xdist workers.
+        """
+        self.cache_dir.mkdir(parents=True, exist_ok=True)
+        with (self.cache_dir / f"{self.project_name}.lock").open("w") as lock:
+            fcntl.flock(lock, fcntl.LOCK_EX)
+            self._up()
+
+    def _up(self) -> None:
         self.prepare_source()
         # Worker images run as siblings, a stack can answer while one is missing.
         missing = self._images_missing(self.built_services())
