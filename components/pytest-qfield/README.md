@@ -298,4 +298,4 @@ Contributions are very welcome.
 
 ## License
 
-Distributed under the terms of the `GNU GPL v2.0` license, "pytest-qfield" is free and open source software.
+Distributed under the terms of the `GNU GPL v2.0 or later` license, "pytest-qfield" is free and open source software.
