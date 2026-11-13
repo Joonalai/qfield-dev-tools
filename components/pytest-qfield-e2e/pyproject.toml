@@ -2,7 +2,7 @@
 name = "pytest-qfield-e2e"
 description = "Pytest fixtures for plugin and end-to-end tests on a real QField app"
 readme = "README.md"
-version = "0.0.0"
+version = "0.1.0"
 keywords = ["pytest", "QField", "QFieldCloud", "GIS", "e2e"]
 license = "GPL-2.0-or-later"
 license-files = ["LICENSE"]

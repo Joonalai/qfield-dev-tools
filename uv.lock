@@ -782,7 +782,7 @@ requires-dist = [
 
 [[package]]
 name = "pytest-qfield-e2e"
-version = "0.0.0"
+version = "0.1.0"
 source = { editable = "components/pytest-qfield-e2e" }
 dependencies = [
     { name = "pytest" },
