@@ -31,7 +31,7 @@ if TYPE_CHECKING:
 
 
 @pytest.fixture(autouse=True)
-def setup(qfield_new_project):
+def setup(qfield_new_project: None) -> None:
     pass
 
 
@@ -46,7 +46,7 @@ def mock_uuid_value(mocker: "MockerFixture") -> str:
 
 
 @pytest.fixture
-def load_simple_plugin(qfield_bot: "QFieldBot", data_path: "Path"):
+def load_simple_plugin(qfield_bot: "QFieldBot", data_path: "Path") -> None:
     qfield_bot.load_plugin(
         data_path / "simple_plugin" / "main.qml", raise_if_warnings=True
     )
@@ -56,7 +56,7 @@ def load_simple_plugin(qfield_bot: "QFieldBot", data_path: "Path"):
 @pytest.fixture
 def load_simple_plugin_without_project_loaded_signal(
     qfield_bot: "QFieldBot", data_path: "Path"
-):
+) -> None:
     qfield_bot.load_plugin(
         data_path / "simple_plugin" / "main.qml", emit_load_project_ended=False
     )
@@ -65,7 +65,7 @@ def load_simple_plugin_without_project_loaded_signal(
 
 
 @pytest.fixture
-def project_loaded(qfield_bot: "QFieldBot", qfield_project_file: "Path"):
+def project_loaded(qfield_bot: "QFieldBot", qfield_project_file: "Path") -> None:
     qfield_bot.open_project(qfield_project_file)
 
 
@@ -83,29 +83,29 @@ def gpkg(tmp_path: Path, data_path: Path) -> Path:
 
 
 @pytest.fixture(scope="module")
-def gpkg_module(tmpdir_factory, data_path: Path) -> Path:
-    tmp_path = Path(tmpdir_factory.mktemp("pytest_qgis_data"))
+def gpkg_module(tmp_path_factory: pytest.TempPathFactory, data_path: Path) -> Path:
+    tmp_path = tmp_path_factory.mktemp("pytest_qgis_data")
     return get_copied_gpkg(tmp_path, data_path)
 
 
 @pytest.fixture(scope="session")
-def gpkg_session(tmpdir_factory, data_path: Path) -> Path:
-    tmp_path = Path(tmpdir_factory.mktemp("pytest_qgis_data"))
+def gpkg_session(tmp_path_factory: pytest.TempPathFactory, data_path: Path) -> Path:
+    tmp_path = tmp_path_factory.mktemp("pytest_qgis_data")
     return get_copied_gpkg(tmp_path, data_path)
 
 
 @pytest.fixture
-def layer_polygon(gpkg: Path):
+def layer_polygon(gpkg: Path) -> QgsVectorLayer:
     return get_gpkg_layer("polygon", gpkg)
 
 
 @pytest.fixture
-def layer_polygon_3067(gpkg: Path):
+def layer_polygon_3067(gpkg: Path) -> QgsVectorLayer:
     return get_gpkg_layer("polygon_3067", gpkg)
 
 
 @pytest.fixture
-def layer_points(gpkg: Path):
+def layer_points(gpkg: Path) -> QgsVectorLayer:
     return get_gpkg_layer("points", gpkg)
 
 

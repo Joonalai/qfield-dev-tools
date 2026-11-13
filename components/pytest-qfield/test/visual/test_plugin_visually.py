@@ -33,7 +33,7 @@ DEFAULT_TIMEOUT = 0.01 if IN_CI else 1
 
 @pytest.mark.qgis_show_map(DEFAULT_TIMEOUT)
 @pytest.mark.usefixtures("load_simple_plugin")
-def test_qfield_bot_should_load_plugin(qfield_bot: "QFieldBot"):
+def test_qfield_bot_should_load_plugin(qfield_bot: "QFieldBot") -> None:
     # Inspect visually that the button exists and the toast is visible
     qfield_bot.click_item(qfield_bot.get_item("pluginButton"))
 
@@ -44,7 +44,7 @@ def test_vector_layer_should_be_visible_in_app(
     qfield_bot: "QFieldBot",
     layer_points: "QgsVectorLayer",
     qgs_project_stub: "QgsProjectStub",
-):
+) -> None:
     assert qgs_project_stub.qgis_project.addMapLayer(layer_points)
     qfield_bot.iface.qgis_map_canvas.setExtent(layer_points.extent())
 
@@ -55,7 +55,7 @@ def test_vector_layer_with_non_default_crs_should_be_visible_in_app(
     qfield_bot: "QFieldBot",
     layer_polygon_3067: "QgsVectorLayer",
     qgs_project_stub: "QgsProjectStub",
-):
+) -> None:
     assert qgs_project_stub.qgis_project.addMapLayer(layer_polygon_3067)
     qfield_bot.set_map_crs_based_on_layers()
     qfield_bot.iface.qgis_map_canvas.setExtent(layer_polygon_3067.extent())
@@ -66,6 +66,6 @@ def test_vector_layer_with_non_default_crs_should_be_visible_in_app(
 )
 def test_qfield_bot_should_open_project_file_and_layers_should_be_visible(
     qfield_bot: "QFieldBot",
-):
+) -> None:
     # qgis_show_map can't be used since it tries to reproject the web map
     qfield_bot.qtbot.wait(DEFAULT_TIMEOUT * 1000)

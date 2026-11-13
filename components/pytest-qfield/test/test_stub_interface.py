@@ -62,7 +62,7 @@ def load_stub_plugin(
     data_path: "Path",
     layer_points: "QgsVectorLayer",
     qgs_project_stub: "QgsProjectStub",
-):
+) -> None:
     qfield_bot.show_window()
     qfield_bot.load_plugin(
         data_path / "stub_tester_plugin" / "main.qml",
@@ -79,7 +79,7 @@ def load_stub_plugin(
 @pytest.mark.usefixtures("load_stub_plugin")
 def test_feature_can_be_created_with_stub_interface(
     qfield_bot: "QFieldBot", layer_points: "QgsVectorLayer"
-):
+) -> None:
     initial_feature_ids = set(layer_points.allFeatureIds())
     qfield_bot.click_item(qfield_bot.get_item("test_creating_feature"))
     assert qfield_bot.iface.logged_messages == [
@@ -101,7 +101,7 @@ def test_feature_can_be_created_with_stub_interface(
 
 
 @pytest.mark.usefixtures("load_stub_plugin")
-def test_features_can_be_iterated_with_stub_interface(qfield_bot: "QFieldBot"):
+def test_features_can_be_iterated_with_stub_interface(qfield_bot: "QFieldBot") -> None:
     button = qfield_bot.get_item("test_feature_iterator")
     qfield_bot.click_item(button)
     assert qfield_bot.iface.logged_messages == [
@@ -113,7 +113,7 @@ def test_features_can_be_iterated_with_stub_interface(qfield_bot: "QFieldBot"):
 @pytest.mark.usefixtures("load_stub_plugin")
 def test_position_source_is_auto_registered_with_default_values(
     qfield_bot: "QFieldBot",
-):
+) -> None:
     qfield_bot.click_item(qfield_bot.get_item("test_position_source"))
     assert qfield_bot.iface.logged_messages == [
         "positionSource active: true",
@@ -125,7 +125,7 @@ def test_position_source_is_auto_registered_with_default_values(
 @pytest.mark.usefixtures("load_stub_plugin")
 def test_geometry_highlighter_is_auto_registered_and_mutable_from_qml(
     qfield_bot: "QFieldBot",
-):
+) -> None:
     qfield_bot.click_item(qfield_bot.get_item("test_geometry_highlighter"))
     assert qfield_bot.iface.logged_messages == [
         "highlighter visible: true",
@@ -138,7 +138,7 @@ def test_geometry_highlighter_is_auto_registered_and_mutable_from_qml(
 @pytest.mark.usefixtures("load_stub_plugin")
 def test_project_entries_are_readable_through_iface(
     qfield_bot: "QFieldBot", qgs_project_stub: "QgsProjectStub"
-):
+) -> None:
     project = qgs_project_stub.qgis_project
     assert project.writeEntry("test", "stringKey", "stored")
     assert project.writeEntry("test", "numKey", 42)
@@ -158,7 +158,7 @@ def test_project_entries_are_readable_through_iface(
 
 
 @pytest.mark.usefixtures("load_stub_plugin")
-def test_unknown_object_name_resolves_to_null(qfield_bot: "QFieldBot"):
+def test_unknown_object_name_resolves_to_null(qfield_bot: "QFieldBot") -> None:
     qfield_bot.click_item(qfield_bot.get_item("test_unknown_named_item"))
     assert qfield_bot.iface.logged_messages == ["unknown is null: true"]
 
@@ -180,7 +180,7 @@ def test_geometry_highlighter_stub_clear_resets_wrapper_fields() -> None:
 
 
 @pytest.mark.usefixtures("load_stub_plugin")
-def test_map_canvas_clicked_signal_propagates_to_qml(qfield_bot: "QFieldBot"):
+def test_map_canvas_clicked_signal_propagates_to_qml(qfield_bot: "QFieldBot") -> None:
     qfield_bot.iface.qml_map_canvas.clicked.emit(QPointF(389870.0, 6678167.0), 2)
     assert qfield_bot.iface.logged_messages == [
         "clicked x: 389870",
@@ -192,7 +192,7 @@ def test_map_canvas_clicked_signal_propagates_to_qml(qfield_bot: "QFieldBot"):
 @pytest.mark.usefixtures("load_stub_plugin")
 def test_map_canvas_confirmed_clicked_signal_propagates_to_qml(
     qfield_bot: "QFieldBot",
-):
+) -> None:
     qfield_bot.iface.qml_map_canvas.confirmedClicked.emit(
         QPointF(389890.0, 6678200.0), 0
     )
@@ -202,7 +202,7 @@ def test_map_canvas_confirmed_clicked_signal_propagates_to_qml(
     ]
 
 
-def test_map_canvas_is_returned_by_iface_map_canvas(qfield_bot: "QFieldBot"):
+def test_map_canvas_is_returned_by_iface_map_canvas(qfield_bot: "QFieldBot") -> None:
     assert qfield_bot.iface.mapCanvas() is qfield_bot.iface.qml_map_canvas
 
 
@@ -247,7 +247,7 @@ def test_map_layers_by_name_pins_layer_stub_ownership(
     tmp_path: "Path",
     layer_points: "QgsVectorLayer",
     qgs_project_stub: "QgsProjectStub",
-):
+) -> None:
     """Layer stubs from ``mapLayersByName`` must be pinned and retained.
 
     They must use ``CppOwnership`` and be kept on ``QgsProjectStub``. Otherwise QML's JS
@@ -289,7 +289,7 @@ Item {
 def test_get_feature_pins_feature_and_geometry_stubs(
     layer_points: "QgsVectorLayer",
     qgs_project_stub: "QgsProjectStub",
-):
+) -> None:
     """Feature and geometry stubs must be pinned and retained too.
 
     Like ``mapLayersByName``, ``QgsVectorLayerStub.getFeature`` and
@@ -316,7 +316,7 @@ def test_get_feature_pins_feature_and_geometry_stubs(
 
 def test_create_geometry_from_wkt_pins_geometry_stub(
     qfield_geometry_utils_stub: "QFieldGeometryUtilsStub",
-):
+) -> None:
     geometry_stub = qfield_geometry_utils_stub.createGeometryFromWkt("POINT(1 2)")
     assert geometry_stub in qfield_geometry_utils_stub._pinned_geometry_stubs
     assert QQmlEngine.objectOwnership(geometry_stub) == (
@@ -328,7 +328,7 @@ def test_feature_iterator_pins_iterator_and_next_features(
     layer_points: "QgsVectorLayer",
     qgs_project_stub: "QgsProjectStub",
     qfield_layer_utils_stub: "QFieldLayerUtilsStub",
-):
+) -> None:
     assert qgs_project_stub.qgis_project.addMapLayer(layer_points)
     [layer_stub] = qgs_project_stub.mapLayersByName("points")
 
@@ -353,7 +353,7 @@ def test_create_feature_pins_feature_stub(
     layer_points: "QgsVectorLayer",
     qgs_project_stub: "QgsProjectStub",
     qfield_feature_utils_stub: "QFieldFeatureUtilsStub",
-):
+) -> None:
     assert qgs_project_stub.qgis_project.addMapLayer(layer_points)
     [layer_stub] = qgs_project_stub.mapLayersByName("points")
 
@@ -368,7 +368,7 @@ def test_delete_feature_removes_feature_via_stub_interface(
     layer_points: "QgsVectorLayer",
     qgs_project_stub: "QgsProjectStub",
     qfield_layer_utils_stub: "QFieldLayerUtilsStub",
-):
+) -> None:
     assert qgs_project_stub.qgis_project.addMapLayer(layer_points)
     [layer_stub] = qgs_project_stub.mapLayersByName("points")
     fid = layer_points.allFeatureIds()[0]
@@ -384,7 +384,7 @@ def test_delete_feature_keeps_open_edit_session_uncommitted(
     layer_points: "QgsVectorLayer",
     qgs_project_stub: "QgsProjectStub",
     qfield_layer_utils_stub: "QFieldLayerUtilsStub",
-):
+) -> None:
     """Keep the delete in the edit buffer when ``flushBuffer`` is false.
 
     When the caller is already editing, the layer keeps editing and a rollback
@@ -410,7 +410,7 @@ def test_delete_feature_flushes_open_edit_session_when_requested(
     layer_points: "QgsVectorLayer",
     qgs_project_stub: "QgsProjectStub",
     qfield_layer_utils_stub: "QFieldLayerUtilsStub",
-):
+) -> None:
     """``flushBuffer`` true commits even an edit session the caller opened."""
     assert qgs_project_stub.qgis_project.addMapLayer(layer_points)
     [layer_stub] = qgs_project_stub.mapLayersByName("points")

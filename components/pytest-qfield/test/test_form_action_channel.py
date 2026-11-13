@@ -39,7 +39,7 @@ if TYPE_CHECKING:
 def test_settings_set_value_and_remove_round_trip_from_qml(
     qfield_bot: "QFieldBot",
     tmp_path: "Path",
-):
+) -> None:
     probe_qml = tmp_path / "settings_probe.qml"
     probe_qml.write_text("""
 import QtQuick
@@ -66,7 +66,7 @@ def test_settings_value_bool_from_qml(
     qfield_bot: "QFieldBot",
     tmp_path: "Path",
     qfield_settings_stub: QSettingsStub,
-):
+) -> None:
     qfield_settings_stub.setValue("myplugin/collapsed", True)  # noqa: QGS202
     probe_qml = tmp_path / "settings_bool_probe.qml"
     probe_qml.write_text("""
@@ -87,7 +87,7 @@ Item {
 
 def test_settings_stub_does_not_leak_between_tests(
     qfield_settings_stub: QSettingsStub,
-):
+) -> None:
     assert qfield_settings_stub.value("myplugin/collapsed") is None
 
 
@@ -95,7 +95,7 @@ def test_focused_feature_and_layer_resolve_from_setfeatures(
     qfield_bot: "QFieldBot",
     layer_points: "QgsVectorLayer",
     qgs_project_stub: "QgsProjectStub",
-):
+) -> None:
     assert qgs_project_stub.qgis_project.addMapLayer(layer_points)
     [layer_stub] = qgs_project_stub.mapLayersByName("points")
     selection = qfield_bot.iface.findItemByObjectName("featureForm").selection
@@ -123,7 +123,7 @@ def test_settings_poll_consumes_token_and_reads_focused_occurrence(
     layer_points: "QgsVectorLayer",
     qgs_project_stub: "QgsProjectStub",
     qfield_settings_stub: QSettingsStub,
-):
+) -> None:
     """Exercise the whole channel end to end.
 
     A Timer-driven poll (as the plugin runs) reads the token a form button wrote, consumes it, and resolves the

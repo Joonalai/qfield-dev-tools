@@ -38,7 +38,7 @@ def load_stub_plugin_on_known_extent(
     layer_points: "QgsVectorLayer",
     qgs_project_stub: "QgsProjectStub",
     qgis_canvas: "QgsMapCanvas",
-):
+) -> None:
     """Load the stub-tester plugin with the qgis_canvas at a known extent.
 
     The fixed extent makes ``click_map_at`` produce predictable screen coords.
@@ -61,7 +61,7 @@ def load_stub_plugin_on_known_extent(
 @pytest.mark.usefixtures("load_stub_plugin_on_known_extent")
 def test_click_map_at_round_trips_through_screen_to_coordinate(
     qfield_bot: "QFieldBot",
-):
+) -> None:
     qfield_bot.click_map_at(QgsPointXY(120.0, 80.0))
 
     # The plugin handler calls screenToCoordinate on the emitted point and
@@ -78,7 +78,7 @@ def test_click_map_at_round_trips_through_screen_to_coordinate(
 
 
 @pytest.mark.usefixtures("load_stub_plugin_on_known_extent")
-def test_click_map_at_passes_click_type_through(qfield_bot: "QFieldBot"):
+def test_click_map_at_passes_click_type_through(qfield_bot: "QFieldBot") -> None:
     qfield_bot.click_map_at(QgsPointXY(10.0, 10.0), click_type=1)
     assert qfield_bot.iface.logged_messages[2] == "clicked type: 1"
 
@@ -86,7 +86,7 @@ def test_click_map_at_passes_click_type_through(qfield_bot: "QFieldBot"):
 @pytest.mark.usefixtures("load_stub_plugin_on_known_extent")
 def test_long_press_map_at_round_trips_through_screen_to_coordinate(
     qfield_bot: "QFieldBot",
-):
+) -> None:
     qfield_bot.long_press_map_at(QgsPointXY(50.0, 150.0))
 
     # stub_tester_plugin's confirmedClicked handler logs only x/y, not type.
@@ -109,7 +109,7 @@ def test_click_item_taps_full_map_overlay_at_canvas_coordinate(
     qgis_canvas: "QgsMapCanvas",
     tmp_path: "Path",
     blocker_parent: str,
-):
+) -> None:
     plugin_qml = tmp_path / "overlay_plugin.qml"
     plugin_qml.write_text(f"""
 import QtQuick
@@ -157,7 +157,7 @@ Item {{
 def test_click_item_raises_when_item_is_outside_window(
     qfield_bot: "QFieldBot",
     tmp_path: "Path",
-):
+) -> None:
     plugin_qml = tmp_path / "offscreen_plugin.qml"
     plugin_qml.write_text("""
 import QtQuick
