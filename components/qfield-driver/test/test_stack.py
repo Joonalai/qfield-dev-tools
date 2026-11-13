@@ -460,3 +460,40 @@ def test_up_skips_the_worker_check_without_a_worker(
     stack.up()
 
     assert calls == [("config", "--services")]
+
+
+def _answers(
+    stack: QFieldCloudStack, monkeypatch: pytest.MonkeyPatch, **out: str
+) -> None:
+    monkeypatch.setattr(
+        stack,
+        "compose",
+        lambda *args, **_kwargs: subprocess.CompletedProcess(
+            args, 0, out.get(args[0], ""), ""
+        ),
+    )
+
+
+def test_project_owns_the_url_it_publishes(
+    stack: QFieldCloudStack, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _answers(stack, monkeypatch, ps="abc123\n", port="127.0.0.1:8543\n")
+
+    assert stack.runs_here()
+    assert stack.publishes_url()
+
+
+def test_project_does_not_own_another_stacks_port(
+    stack: QFieldCloudStack, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _answers(stack, monkeypatch, ps="", port="127.0.0.1:8443\n")
+
+    assert not stack.runs_here()
+    assert not stack.publishes_url()
+
+
+def test_unfetched_checkout_runs_and_publishes_nothing(tmp_path: Path) -> None:
+    stack = QFieldCloudStack.with_offset("v0.0.0-never", tmp_path, 0)
+
+    assert not stack.runs_here()
+    assert not stack.publishes_url()

@@ -433,9 +433,25 @@ class QFieldCloudStack:
         except (OSError, ValueError):
             return False
 
-    def _runs_here(self) -> bool:
-        """Whether this ref's own app container is running."""
+    def runs_here(self) -> bool:
+        """Whether this compose project's own app container is running.
+
+        False while the checkout is not fetched, nothing can run from it yet.
+        """
+        if not self.source_dir.is_dir():
+            return False
         return bool(self.compose("ps", "--quiet", "app", check=False).stdout.strip())
+
+    def publishes_url(self) -> bool:
+        """Whether this compose project's nginx publishes the stack's HTTPS port.
+
+        `is_up` only tells that something answers there. False while the
+        checkout is not fetched.
+        """
+        if not self.source_dir.is_dir():
+            return False
+        published = self.compose("port", "nginx", "443", check=False).stdout.strip()
+        return published.endswith(f":{self.https_port}")
 
     def built_services(self) -> list[str]:
         """Services the release builds itself, profiles included.
@@ -536,7 +552,7 @@ class QFieldCloudStack:
             self.compose("--profile", "*", "build", *missing)
             self._tag_images(built, version)
         elif self.is_up() and not self.reconfigured:
-            if not self._runs_here():
+            if not self.runs_here():
                 msg = (
                     f"Another QFieldCloud answers on port {self.https_port}, stop it"
                     " with `qfield-driver-cloud prune` or pick other"
