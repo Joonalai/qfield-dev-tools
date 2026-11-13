@@ -30,29 +30,15 @@ src = ["components/*/src", "components/*"]
 
 target-version = "py310"
 
-lint.select = [
-    "ANN", # flake8-annotations
-    "ARG", # flake8-unused-arguments
-    "B", # flake8-bugbear
-    "C", # flake8-comprehensions
-    "C90", # flake8, mccabe
-    "E", # flake8, pycodestyle
-    "F", # flake8, Pyflakes
-    "I", # isort
-    "INP", # flake8-no-pep420
-    "N", # pep8-naming
-    "PIE", # flake8-pie
-    "PGH", # pygrep-hooks
-    "PL", # pylint
-    "PT", # flake8-pytest-style
-    "RUF", # Ruff-specific rules
-    "SIM", # flake8-simplify
-    "T", # flake8-print
-    "ICN", # flake8-import-conventions
-    "TCH", # flake8-type-checking
-    "TID", # flake8-tidy-imports
-    "W", # flake8, pycodestyle
-    "UP", # pyupgrade
+lint.select = ["ALL"]
+
+lint.ignore = [
+    "COM812", # conflicts with the formatter
+    "D1", # docstrings only where the code doesn't already say it
+    "D203", # conflicts with D211
+    "D213", # conflicts with D212
+    "FIX002", # TODOs are allowed when they have an author (TD002)
+    "TD003", # TODOs are not tracked as issues
 ]
 
 lint.unfixable = [
@@ -63,7 +49,13 @@ lint.unfixable = [
 lint.external = ["QGS"]
 
 [tool.ruff.lint.per-file-ignores]
-"components/pytest-qfield/src/pytest_qfield/stub_interface/*" = ["N802", "N815"]
+# Stubs mirror QField's C++ API, which QML calls positionally
+"components/pytest-qfield/src/pytest_qfield/stub_interface/*" = [
+    "FBT001",
+    "FBT002",
+    "N802",
+    "N815",
+]
 "components/pytest-qfield/src/pytest_qfield/qfield_resources.py" = ["N802", "ANN201", "INP"]
 "components/*/test/*" = [
     "ANN001", # missing-type-function-argument
@@ -71,6 +63,9 @@ lint.external = ["QGS"]
     "PLR2004", # magic-value-comparison
     "N802", # Function name should be lowercase
     "E501", # Line too long
+    "FBT003", # QML-facing APIs take positional booleans
+    "S101", # assert
+    "SLF001", # private-member-access
 ]
 
 [tool.flake8]
