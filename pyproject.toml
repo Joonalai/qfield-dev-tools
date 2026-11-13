@@ -60,6 +60,8 @@ lint.external = ["QGS"]
 "components/pytest-qfield/src/pytest_qfield/qfield_resources.py" = ["N802", "ANN201", "INP"]
 # The stack is driven through the docker and git CLIs
 "components/qfield-driver/src/qfield_driver/cloud/stack.py" = ["S603", "S607"]
+# Run as standalone scripts, not imported
+"scripts/*" = ["INP001"]
 "components/*/test/*" = [
     "PLR2004", # magic-value-comparison
     "N802", # Function name should be lowercase
