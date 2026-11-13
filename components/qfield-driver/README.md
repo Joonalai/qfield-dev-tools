@@ -94,9 +94,11 @@ Other methods: `click`, `long_press`, `drag`, `type_text`, `key`, `screenshot`,
 
 `qfield_driver.actions` has user level helpers built on QField's own item
 names: `tap_object`, `tap_text`, `tap_icon`, `type_into`, `expand_drawer`,
-`open_project`, `frame_map`, `tap_map`, `long_press_map`, `digitize_point`,
-`open_feature_form`, `edit_in_form`, `delete_feature`, `set_field`, `choose_option`, `toggle_switch`,
+`open_project`, `frame_map`, `tap_map`, `long_press_map`, `set_active_layer`, `digitize_point`,
+`open_feature_form`, `edit_in_form`, `delete_feature`, `current_form`, `set_field`,
+`choose_option`, `toggle_switch`,
 `tick_item`, `search_and_tick`, `attach_photo`, `open_related`, `save_form`,
+`save_open_form` (also a digitized feature's form),
 `wait_visible`, `wait_for_text` (toasts), `frame_and_tap`, `scan_code` (QField's
 code reader), `features`, `geometries`, `feature_count`, `add_feature`,
 `change_geometry`, `evaluate_expression`, `import_js` (call a plugin's JS module),
