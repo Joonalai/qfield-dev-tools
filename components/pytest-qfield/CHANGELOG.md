@@ -2,6 +2,14 @@
 
 <!-- version list -->
 
+## v0.12.0 (2026-11-13)
+
+### Features
+
+- Fetch the QField source for a configured QField version
+  ([`1d93471`](https://github.com/Joonalai/qfield-dev-tools/commit/1d93471c8b4118db55a3c4ba3438402b7bdcdf20))
+
+
 ## v0.11.1 (2026-11-13)
 
 ### Bug Fixes
