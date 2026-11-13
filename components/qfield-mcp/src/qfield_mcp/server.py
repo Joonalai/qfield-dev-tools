@@ -512,18 +512,21 @@ def open_feature_form(
 def set_field(label: str, value: Any, *, device: str = "device") -> str:  # noqa: ANN401
     """Change a field of the open feature form through its editor widget.
 
+    Works on the form of an existing feature and on the form of a feature that
+    digitizing just added, whichever is open.
+
     :param label: The field's alias, its name when it has none
     """
     with devices.use(device) as app:
-        actions.set_field(app, label, value)
+        actions.set_field(app, label, value, actions.current_form(app))
     return "set"
 
 
 @tool
 def save_form(*, device: str = "device") -> str:
-    """Save the open feature form with its check button."""
+    """Save the open feature form, a digitized feature's form too."""
     with devices.use(device) as app:
-        actions.save_form(app)
+        actions.save_open_form(app)
     return "saved"
 
 

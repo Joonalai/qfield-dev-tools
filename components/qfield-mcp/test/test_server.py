@@ -18,6 +18,7 @@
 
 import asyncio
 import json
+import shutil
 import subprocess
 from collections.abc import Iterator
 from concurrent.futures import ThreadPoolExecutor
@@ -36,6 +37,10 @@ from qfield_mcp.devices import (
 )
 
 DEVICE = "mcp"
+POINTS = "points"
+NEW_POINT = (385000.0, 6672000.0)
+# Shares the QField test project with pytest-qfield
+DATA = Path(__file__).parents[2] / "pytest-qfield" / "test" / "data"
 
 
 def call(tool: str, **arguments: Any) -> Any:  # noqa: ANN401
@@ -55,6 +60,32 @@ def device() -> Iterator[str]:
     yield DEVICE
     if DEVICE in server.devices.names():
         call("stop_device", name=DEVICE)
+
+
+@pytest.fixture(scope="module")
+def project_device(tmp_path_factory: pytest.TempPathFactory) -> Iterator[str]:
+    """Start a device with a copy of the QField test project open."""
+    target = tmp_path_factory.mktemp("project")
+    shutil.copytree(DATA / "qfield_project", target, dirs_exist_ok=True)
+    call("start_device", name="forms")
+    call(
+        "open_project",
+        device="forms",
+        path=str(target / "pytest-qfield-project_qfield.qgs"),
+    )
+    yield "forms"
+    call("stop_device", name="forms")
+
+
+def texts(device: str, expression: str = "") -> list[str]:
+    rows = call(
+        "features",
+        layer=POINTS,
+        fields=["text_field"],
+        expression=expression,
+        device=device,
+    )
+    return [row["text_field"] for row in rows]
 
 
 @pytest.mark.qfield_app
@@ -136,6 +167,56 @@ def test_device_restarts_under_the_same_name(device: str) -> None:
     call("start_device", name=device)
 
     assert call("list_devices") == [device]
+
+
+@pytest.mark.qfield_app
+def test_set_field_and_save_form_use_the_form_of_an_existing_feature(
+    project_device: str,
+) -> None:
+    call(
+        "open_feature_form",
+        layer=POINTS,
+        expression="text_field = 'test'",
+        device=project_device,
+    )
+    call("set_field", label="text_field", value="edited", device=project_device)
+    call("save_form", device=project_device)
+
+    assert texts(project_device, "text_field = 'edited'") == ["edited"]
+    call("close_feature_form", device=project_device)
+
+
+@pytest.mark.qfield_app
+def test_set_field_and_save_form_use_the_form_of_a_new_feature(
+    project_device: str,
+) -> None:
+    call("frame_map", x=NEW_POINT[0], y=NEW_POINT[1], device=project_device)
+    call(
+        "eval_js",
+        code="find('dashBoard').activeLayer = qgisProject.mapLayersByName('points')[0];",
+        device=project_device,
+    )
+    call(
+        "eval_js",
+        code="iface.mainWindow().changeMode('digitize');",
+        device=project_device,
+    )
+    call("tap_map", x=NEW_POINT[0], y=NEW_POINT[1], device=project_device)
+    call(
+        "wait_for",
+        js="return find('overlayFeatureFormDrawer').opened",
+        device=project_device,
+    )
+
+    call("set_field", label="text_field", value="new one", device=project_device)
+    call("save_form", device=project_device)
+
+    assert texts(project_device, "text_field = 'new one'") == ["new one"]
+    call(
+        "eval_js",
+        code="iface.mainWindow().changeMode('browse');",
+        device=project_device,
+    )
 
 
 def test_unusable_app_binary_is_named_in_the_error(
