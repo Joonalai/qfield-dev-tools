@@ -4,7 +4,7 @@ description = "Download QField AppImages and QField and QFieldCloud sources into
 readme = "README.md"
 version = "0.0.0"
 keywords = ["QField", "QFieldCloud", "GIS", "AppImage"]
-license = "GPL-2.0-only"
+license = "GPL-2.0-or-later"
 license-files = ["LICENSE"]
 requires-python = ">=3.12"
 classifiers = [
