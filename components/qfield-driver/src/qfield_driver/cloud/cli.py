@@ -33,6 +33,7 @@ from qfield_driver.cloud.stack import (
     QFieldCloudStack,
     StackError,
     down_stale,
+    hosted_ref,
     resolve_ref,
 )
 from qfield_fetch import CACHE_ENV, default_cache_dir
@@ -89,9 +90,21 @@ def _stack(
 
 
 @app.command("ref")
-def show_ref(ref: Ref = HOSTED) -> None:
-    """Print the tag a ref resolves to."""
-    typer.echo(resolve_ref(ref))
+def show_ref(
+    ref: Ref = HOSTED,
+    check: Annotated[
+        str | None,
+        typer.Option(help="Exit 1 unless this tag is what app.qfield.cloud runs."),
+    ] = None,
+) -> None:
+    """Print the tag a ref resolves to, or compare a pinned tag with hosted."""
+    if check is None:
+        typer.echo(resolve_ref(ref))
+        return
+    hosted = hosted_ref()
+    typer.echo(f"pinned {check}, hosted {hosted}")
+    if check != hosted:
+        raise typer.Exit(1)
 
 
 @app.command()
