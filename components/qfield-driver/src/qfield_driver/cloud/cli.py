@@ -61,6 +61,15 @@ SourceDir = Annotated[
     ),
 ]
 
+PortOffset = Annotated[
+    int,
+    typer.Option(
+        min=0,
+        envvar="QFIELDCLOUD_PORT_OFFSET",
+        help="Move every port and the compose project by this offset.",
+    ),
+]
+
 
 @app.callback()
 def main() -> None:
@@ -72,11 +81,11 @@ def _cache_dir(cache_dir: Path | None) -> Path:
 
 
 def _stack(
-    ref: str, cache_dir: Path | None, source_dir: Path | None
+    ref: str, cache_dir: Path | None, source_dir: Path | None, offset: int = 0
 ) -> QFieldCloudStack:
     if source_dir:
-        return QFieldCloudStack.local(source_dir, _cache_dir(cache_dir))
-    return QFieldCloudStack(resolve_ref(ref), _cache_dir(cache_dir))
+        return QFieldCloudStack.local(source_dir, _cache_dir(cache_dir), offset)
+    return QFieldCloudStack.with_offset(resolve_ref(ref), _cache_dir(cache_dir), offset)
 
 
 @app.command("ref")
@@ -87,10 +96,13 @@ def show_ref(ref: Ref = HOSTED) -> None:
 
 @app.command()
 def up(
-    ref: Ref = HOSTED, cache_dir: CacheDir = None, source_dir: SourceDir = None
+    ref: Ref = HOSTED,
+    cache_dir: CacheDir = None,
+    source_dir: SourceDir = None,
+    port_offset: PortOffset = 0,
 ) -> None:
     """Build and start a stack, and print its URL."""
-    stack = _stack(ref, cache_dir, source_dir)
+    stack = _stack(ref, cache_dir, source_dir, port_offset)
     try:
         stack.up()
     except StackError as error:
@@ -101,10 +113,13 @@ def up(
 
 @app.command()
 def down(
-    ref: Ref = HOSTED, cache_dir: CacheDir = None, source_dir: SourceDir = None
+    ref: Ref = HOSTED,
+    cache_dir: CacheDir = None,
+    source_dir: SourceDir = None,
+    port_offset: PortOffset = 0,
 ) -> None:
     """Remove a stack and its data volumes, keep its images."""
-    _stack(ref, cache_dir, source_dir).down()
+    _stack(ref, cache_dir, source_dir, port_offset).down()
 
 
 @app.command()

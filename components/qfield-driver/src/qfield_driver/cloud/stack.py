@@ -36,6 +36,7 @@ import socket
 import ssl
 import subprocess
 import time
+from contextlib import contextmanager
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
@@ -53,7 +54,7 @@ from qfield_fetch import (
 )
 
 if TYPE_CHECKING:
-    from collections.abc import Callable
+    from collections.abc import Callable, Iterator
 
 LOGGER = logging.getLogger(__name__)
 
@@ -62,8 +63,9 @@ HOSTED_STATUS = "https://app.qfield.cloud/api/v1/status/"
 HOSTED = "hosted"
 SOURCE_ENV = "QFIELDCLOUD_SOURCE_DIR"
 OVERRIDE = "docker-compose.override.pytest.yml"
-# Generated per release, services differ between releases.
-SERVICES_OVERRIDE = "docker-compose.override.pytest-services.yml"
+# Generated per project, services differ between releases and ports between stacks
+# that share one checkout.
+SERVICES_OVERRIDE = "docker-compose.override.pytest-services"
 UPSTREAM_FILES = ("docker-compose.yml", "docker-compose.override.standalone.yml")
 # Started by hand to avoid its scheduled jobs.
 DISABLED_SERVICES = ("ofelia",)
@@ -71,6 +73,14 @@ RESOLVER_SCRIPT = "nginx-fix-resolver.sh"
 PROJECT_PREFIX = "pytest_qfieldcloud_"
 READY_TIMEOUT_S = 300
 ADMIN = ("admin", "admin123")
+# Default host ports, by `QFieldCloudStack` field.
+PORTS = {
+    "https_port": 8543,
+    "http_port": 8180,
+    "postgres_port": 8432,
+    "storage_port": 8113,
+    "storage_api_port": 8109,
+}
 
 
 class StackError(RuntimeError):
@@ -185,11 +195,11 @@ class QFieldCloudStack:
     ref: str
     # The qfield-fetch cache, which holds the checkout.
     cache_dir: Path
-    https_port: int = 8543
-    http_port: int = 8180
-    postgres_port: int = 8432
-    storage_port: int = 8113
-    storage_api_port: int = 8109
+    https_port: int = PORTS["https_port"]
+    http_port: int = PORTS["http_port"]
+    postgres_port: int = PORTS["postgres_port"]
+    storage_port: int = PORTS["storage_port"]
+    storage_api_port: int = PORTS["storage_api_port"]
     # Host in storage endpoint URLs, see `host_address`.
     storage_host: str = field(default_factory=host_address)
     admin: tuple[str, str] = ADMIN
@@ -200,18 +210,45 @@ class QFieldCloudStack:
     source: Path | None = None
     # Set by `prepare_source`, a running stack then restarts what changed.
     reconfigured: bool = field(default=False, init=False)
+    # The engine socket the worker mounts, set by `prepare_source`.
+    socket: str = field(default="", init=False)
 
     @classmethod
-    def local(cls, source: Path, cache_dir: Path) -> QFieldCloudStack:
+    def with_offset(
+        cls,
+        ref: str,
+        cache_dir: Path,
+        offset: int,
+        **kwargs: Any,  # noqa: ANN401 the fields
+    ) -> QFieldCloudStack:
+        """Return a stack with every port moved up by `offset` from the defaults.
+
+        The default compose project gets the offset as a suffix, so stacks of
+        parallel worktrees never share containers, volumes or an admin token.
+        Ports and name given in `kwargs` win over the offset, offset 0 changes
+        nothing.
+        """
+        if offset < 0:
+            msg = f"Port offset must not be negative: {offset}"
+            raise ValueError(msg)
+        if offset:
+            for key, default in PORTS.items():
+                kwargs.setdefault(key, default + offset)
+            kwargs.setdefault("name", f"{compose_project_name(ref)}-{offset}")
+        return cls(ref, cache_dir, **kwargs)
+
+    @classmethod
+    def local(cls, source: Path, cache_dir: Path, offset: int = 0) -> QFieldCloudStack:
         """Return a stack running from a QFieldCloud checkout of your own.
 
         The stack writes its `.env` and compose overrides into the checkout.
+        Ports and name move by `offset` as in `with_offset`.
         """
         source = source.expanduser().resolve()
         if not (source / ".env.example").is_file():
             msg = f"Not a QFieldCloud checkout: {source}"
             raise FileNotFoundError(msg)
-        return cls(local_ref(source), cache_dir, source=source)
+        return cls.with_offset(local_ref(source), cache_dir, offset, source=source)
 
     @property
     def url(self) -> str:
@@ -220,6 +257,15 @@ class QFieldCloudStack:
     @property
     def project_name(self) -> str:
         return self.name or compose_project_name(self.ref)
+
+    @property
+    def env_file(self) -> Path:
+        """Compose environment of this project, apart from stacks of the same ref."""
+        return self.source_dir / f".env.{self.project_name}"
+
+    @property
+    def services_override(self) -> str:
+        return f"{SERVICES_OVERRIDE}.{self.project_name}.yml"
 
     @property
     def source_dir(self) -> Path:
@@ -231,10 +277,13 @@ class QFieldCloudStack:
         """CA of the stack's self-signed certificate, written by mkcert."""
         return self.source_dir / "conf/nginx/certs/rootCA.pem"
 
+    def _compose_file(self) -> str:
+        return ":".join((*UPSTREAM_FILES, OVERRIDE, self.services_override))
+
     def env_overrides(self) -> dict[str, str]:
         return {
             "COMPOSE_PROJECT_NAME": self.project_name,
-            "COMPOSE_FILE": ":".join((*UPSTREAM_FILES, OVERRIDE, SERVICES_OVERRIDE)),
+            "COMPOSE_FILE": self._compose_file(),
             "WEB_HTTP_PORT": str(self.http_port),
             "WEB_HTTPS_PORT": str(self.https_port),
             "OBJECT_STORAGE_BROWSER_PORT": str(self.storage_port),
@@ -247,7 +296,7 @@ class QFieldCloudStack:
             "DEBUG_WORKER_WRAPPER_DEBUGPY_PORT": '""',
             # wrapper.py hands its own /tmp path to the sibling, so it must match.
             "TMP_DIRECTORY": "/tmp",  # noqa: S108 path inside the container
-            "PYTEST_QFIELDCLOUD_SOCKET": container_socket(),
+            "PYTEST_QFIELDCLOUD_SOCKET": self.socket,
             **self.extra_env,
         }
 
@@ -257,10 +306,24 @@ class QFieldCloudStack:
         Sets `reconfigured` when the configuration changed, the storage host
         follows the network for example.
         """
+        with self._checkout_lock():
+            return self._prepare_source()
+
+    @contextmanager
+    def _checkout_lock(self) -> Iterator[None]:
+        """Serialise stacks of one checkout, which they fetch and write into."""
+        self.cache_dir.mkdir(parents=True, exist_ok=True)
+        key = hashlib.sha256(str(self.source_dir).encode()).hexdigest()[:12]
+        with (self.cache_dir / f".checkout-{key}.lock").open("w") as lock:
+            fcntl.flock(lock, fcntl.LOCK_EX)
+            yield
+
+    def _prepare_source(self) -> Path:
         source = self.source or qfieldcloud_source(self.ref, self.cache_dir)
-        before = self._configuration(source)
+        before = self._configuration()
         shutil.copy(HERE / OVERRIDE, source / OVERRIDE)
         shutil.copy(HERE / RESOLVER_SCRIPT, source / RESOLVER_SCRIPT)
+        self.socket = container_socket()
         env = render_env((source / ".env.example").read_text(), self.env_overrides())
         # Storage endpoints must reach the published API port from containers
         # and from the host alike.
@@ -269,16 +332,15 @@ class QFieldCloudStack:
             rf"\g<1>{self.storage_host}:{self.storage_api_port}",
             env,
         )
-        (source / ".env").write_text(env)
-        (source / SERVICES_OVERRIDE).write_text(self._services_override())
-        self.reconfigured = self._configuration(source) != before
+        self.env_file.write_text(env)
+        (source / self.services_override).write_text(self._services_override())
+        self.reconfigured = self._configuration() != before
         return source
 
-    @staticmethod
-    def _configuration(source: Path) -> list[str | None]:
+    def _configuration(self) -> list[str | None]:
         return [
             path.read_text() if path.exists() else None
-            for path in (source / ".env", source / SERVICES_OVERRIDE)
+            for path in (self.env_file, self.source_dir / self.services_override)
         ]
 
     def _bind(self, port: dict[str, Any]) -> str:
@@ -318,11 +380,19 @@ class QFieldCloudStack:
     def compose(
         self, *args: str, check: bool = True
     ) -> subprocess.CompletedProcess[str]:
+        # The checkout's other stacks write their own env files, so name ours.
+        # Explicit `--file` arguments win over COMPOSE_FILE.
+        prefix = ["--project-name", self.project_name]
+        env = {**os.environ, "PWD": str(self.source_dir)}
+        if self.env_file.exists():
+            prefix += ["--env-file", str(self.env_file)]
+        if (self.source_dir / self.services_override).exists():
+            env["COMPOSE_FILE"] = self._compose_file()
         # The upstream compose file resolves a volume through $PWD.
         completed = subprocess.run(
-            ["docker", "compose", *args],
+            ["docker", "compose", *prefix, *args],
             cwd=self.source_dir,
-            env={**os.environ, "PWD": str(self.source_dir)},
+            env=env,
             check=False,
             text=True,
             capture_output=True,
@@ -496,13 +566,42 @@ class QFieldCloudStack:
             self.compose("down", "-v", "--remove-orphans", check=False)
 
 
+def _compose_projects(ref: str) -> list[str]:
+    """Compose projects of a ref, the plain one and those moved by an offset.
+
+    The offset suffix uses `-`, which `compose_project_name` never produces, so
+    it cannot be mistaken for a ref that ends in a number.
+    """
+    completed = subprocess.run(
+        ["docker", "compose", "ls", "--all", "--format", "json"],
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    try:
+        names = [project["Name"] for project in json.loads(completed.stdout)]
+    except (ValueError, KeyError, TypeError):
+        return []
+    pattern = re.compile(rf"{re.escape(compose_project_name(ref))}(-\d+)?")
+    return [name for name in names if pattern.fullmatch(name)]
+
+
 def down_stale(cache_dir: Path, keep: str) -> list[str]:
-    """Remove stacks of other refs, and return the refs removed."""
+    """Remove stacks of other refs, offset ones included, and return the refs."""
     removed = []
     for entry in entries(cache_dir):
         if entry.kind != Kind.QFIELDCLOUD or entry.name == keep:
             continue
-        QFieldCloudStack(entry.name, cache_dir).down()
+        for project in _compose_projects(entry.name):
+            subprocess.run(
+                [
+                    *("docker", "compose", "--project-name", project),
+                    *("down", "-v", "--remove-orphans"),
+                ],
+                check=False,
+                capture_output=True,
+                text=True,
+            )
         remove(Kind.QFIELDCLOUD, entry.name, cache_dir)
         removed.append(entry.name)
     return removed

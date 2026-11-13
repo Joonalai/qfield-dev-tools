@@ -21,6 +21,7 @@ import json
 import re
 import subprocess
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 
@@ -50,6 +51,7 @@ def stack(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> QFieldCloudStack:
         'STORAGES=\'{"default": {"endpoint_url": "http://172.17.0.1:8009"}}\'\n'
     )
     monkeypatch.setattr(stack_module, "qfieldcloud_source", lambda *_args: source)
+    monkeypatch.setattr(stack_module, "entry_path", lambda *_args: source)
     stack = QFieldCloudStack("v1", tmp_path, storage_host="192.0.2.5")
     monkeypatch.setattr(
         stack,
@@ -77,7 +79,7 @@ def test_ports_bind_to_localhost_but_storage_api_to_the_storage_host(
 
 
 def test_changed_configuration_is_noticed(stack: QFieldCloudStack) -> None:
-    source = stack.prepare_source()
+    stack.prepare_source()
     first = stack.reconfigured
     stack.prepare_source()
     unchanged = stack.reconfigured
@@ -85,7 +87,7 @@ def test_changed_configuration_is_noticed(stack: QFieldCloudStack) -> None:
     stack.prepare_source()
 
     assert (first, unchanged, stack.reconfigured) == (True, False, True)
-    assert "http://192.0.2.6:8109" in (source / ".env").read_text()
+    assert "http://192.0.2.6:8109" in stack.env_file.read_text()
 
 
 def test_own_checkout_runs_without_fetching(
@@ -109,7 +111,7 @@ def test_own_checkout_runs_without_fetching(
         "local-QFieldCloud",
         "pytest_qfieldcloud_local_qfieldcloud",
     )
-    assert "WEB_HTTP_PORT=8180" in (checkout / ".env").read_text()
+    assert "WEB_HTTP_PORT=8180" in stack.env_file.read_text()
 
 
 def test_own_checkout_must_be_qfieldcloud(tmp_path: Path) -> None:
@@ -182,3 +184,177 @@ def test_images_are_tagged_with_the_version(
     assert missing == ["app"]
     assert stack._images_missing(["app"], "new") == []
     assert images["pytest_qfieldcloud_v1-app"] == {"latest", "new"}
+
+
+def _ports(stack: QFieldCloudStack) -> list[int]:
+    return [
+        stack.https_port,
+        stack.http_port,
+        stack.postgres_port,
+        stack.storage_port,
+        stack.storage_api_port,
+    ]
+
+
+def test_offset_moves_every_port_and_suffixes_the_name(tmp_path: Path) -> None:
+    plain = QFieldCloudStack("v1", tmp_path)
+    moved = QFieldCloudStack.with_offset("v1", tmp_path, 10)
+
+    assert _ports(moved) == [port + 10 for port in _ports(plain)]
+    assert moved.project_name == f"{plain.project_name}-10"
+
+
+def test_offset_zero_is_the_plain_stack(tmp_path: Path) -> None:
+    plain = QFieldCloudStack("v1", tmp_path)
+    zero = QFieldCloudStack.with_offset("v1", tmp_path, 0)
+
+    assert _ports(zero) == _ports(plain)
+    assert zero.project_name == plain.project_name
+
+
+def test_explicit_ports_and_name_win_over_the_offset(tmp_path: Path) -> None:
+    moved = QFieldCloudStack.with_offset(
+        "v1", tmp_path, 10, https_port=9000, name="mine"
+    )
+
+    assert moved.https_port == 9000
+    assert moved.http_port == QFieldCloudStack("v1", tmp_path).http_port + 10
+    assert moved.project_name == "mine"
+
+
+def test_negative_offset_is_rejected(tmp_path: Path) -> None:
+    with pytest.raises(ValueError, match="negative"):
+        QFieldCloudStack.with_offset("v1", tmp_path, -1)
+
+
+def test_local_stack_takes_the_offset(tmp_path: Path) -> None:
+    source = tmp_path / "QFieldCloud"
+    source.mkdir()
+    (source / ".env.example").write_text("")
+
+    moved = QFieldCloudStack.local(source, tmp_path, offset=5)
+
+    assert moved.source == source.resolve()
+    assert moved.https_port == QFieldCloudStack("v1", tmp_path).https_port + 5
+    assert moved.project_name.endswith("-5")
+
+
+def _stub_compose(stack: QFieldCloudStack, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(
+        stack,
+        "compose",
+        lambda *args, **_kwargs: subprocess.CompletedProcess(
+            args, 0, json.dumps(SERVICES), ""
+        ),
+    )
+
+
+def test_offsets_on_one_ref_keep_their_own_configuration(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    source = tmp_path / "source"
+    source.mkdir()
+    (source / ".env.example").write_text("WEB_HTTPS_PORT=1\n")
+    monkeypatch.setattr(stack_module, "qfieldcloud_source", lambda *_args: source)
+    monkeypatch.setattr(stack_module, "entry_path", lambda *_args: source)
+    first = QFieldCloudStack.with_offset("v1", tmp_path, 10)
+    second = QFieldCloudStack.with_offset("v1", tmp_path, 20)
+    for stack in (first, second):
+        _stub_compose(stack, monkeypatch)
+    first.prepare_source()
+    first_env = first.env_file.read_text()
+
+    second.prepare_source()
+    first.prepare_source()
+
+    assert first.env_file != second.env_file
+    assert first.services_override != second.services_override
+    assert first.env_file.read_text() == first_env
+    assert "WEB_HTTPS_PORT=8553" in first_env
+    assert "WEB_HTTPS_PORT=8563" in second.env_file.read_text()
+    assert not first.reconfigured
+
+
+def test_compose_targets_the_project_of_its_own_stack(
+    stack: QFieldCloudStack, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    other = QFieldCloudStack.with_offset("v1", stack.cache_dir, 10)
+    monkeypatch.undo()
+    commands: list[tuple[list[str], dict[str, str]]] = []
+
+    def run(
+        command: list[str], *, env: dict[str, str], **_kwargs: object
+    ) -> subprocess.CompletedProcess[str]:
+        commands.append((command, env))
+        return subprocess.CompletedProcess(command, 0, "", "")
+
+    monkeypatch.setattr(subprocess, "run", run)
+    stack.source_dir.mkdir(parents=True, exist_ok=True)
+    other.source_dir.mkdir(parents=True, exist_ok=True)
+    for one in (stack, other):
+        one.env_file.write_text("")
+        (one.source_dir / one.services_override).write_text("")
+        one.compose("ps")
+
+    (first, first_env), (second, second_env) = commands
+    assert first[:6] == [
+        "docker",
+        "compose",
+        "--project-name",
+        stack.project_name,
+        "--env-file",
+        str(stack.env_file),
+    ]
+    assert second[3] == other.project_name
+    assert first_env["COMPOSE_FILE"].endswith(stack.services_override)
+    assert second_env["COMPOSE_FILE"].endswith(other.services_override)
+
+
+def test_down_stale_removes_offset_stacks_of_a_stale_ref(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    entry = SimpleNamespace(kind=stack_module.Kind.QFIELDCLOUD, name="v1")
+    listed = [
+        {"Name": "pytest_qfieldcloud_v1"},
+        {"Name": "pytest_qfieldcloud_v1-10"},
+        {"Name": "pytest_qfieldcloud_v10"},
+    ]
+    commands = []
+
+    def run(command: list[str], **_kwargs: object) -> subprocess.CompletedProcess[str]:
+        commands.append(command)
+        return subprocess.CompletedProcess(command, 0, json.dumps(listed), "")
+
+    monkeypatch.setattr(stack_module, "entries", lambda _cache: [entry])
+    monkeypatch.setattr(stack_module, "remove", lambda *_args: None)
+    monkeypatch.setattr(subprocess, "run", run)
+
+    assert stack_module.down_stale(tmp_path, keep="v2") == ["v1"]
+    downed = [command[3] for command in commands if "down" in command]
+    assert downed == ["pytest_qfieldcloud_v1", "pytest_qfieldcloud_v1-10"]
+
+
+def test_down_stale_keeps_a_ref_that_ends_like_an_offset_name(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    stale = SimpleNamespace(kind=stack_module.Kind.QFIELDCLOUD, name="v26.3")
+    kept = SimpleNamespace(kind=stack_module.Kind.QFIELDCLOUD, name="v26.3.1")
+    offset_name = QFieldCloudStack.with_offset("v26.3", tmp_path, 1).project_name
+    listed = [
+        {"Name": QFieldCloudStack("v26.3", tmp_path).project_name},
+        {"Name": offset_name},
+        {"Name": QFieldCloudStack("v26.3.1", tmp_path).project_name},
+    ]
+    commands = []
+
+    def run(command: list[str], **_kwargs: object) -> subprocess.CompletedProcess[str]:
+        commands.append(command)
+        return subprocess.CompletedProcess(command, 0, json.dumps(listed), "")
+
+    monkeypatch.setattr(stack_module, "entries", lambda _cache: [stale, kept])
+    monkeypatch.setattr(stack_module, "remove", lambda *_args: None)
+    monkeypatch.setattr(subprocess, "run", run)
+
+    assert stack_module.down_stale(tmp_path, keep="v26.3.1") == ["v26.3"]
+    downed = [command[3] for command in commands if "down" in command]
+    assert downed == ["pytest_qfieldcloud_v26_3", offset_name]
