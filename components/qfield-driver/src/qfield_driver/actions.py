@@ -46,6 +46,7 @@ EMBEDDED_FORM = (
 )
 SAVE_ICON = "ic_check_white_24dp"
 EDIT_ICON = "ic_edit_attributes"
+FORM_MENU_ICON = "ic_dot_menu_black_24dp"
 
 
 def js(value: object) -> str:
@@ -554,17 +555,19 @@ def features(
     """)
 
 
-def feature_count(app: QFieldApp, layer: str, expression: str = "") -> int:
-    return int(
-        app.eval(f"""
-      const layer = qgisProject.mapLayersByName({js(layer)})[0];
+def _count_js(layer: str, expression: str) -> str:
+    """JS statements that leave the number of matching features in `n`."""
+    return f"""
+      const layer = {_layer(layer)};
       const it = {_iterator(expression)};
       let n = 0;
       while (it.hasNext()) {{ it.next(); n++; }}
       it.close();
-      return n;
-    """)
-    )
+    """
+
+
+def feature_count(app: QFieldApp, layer: str, expression: str = "") -> int:
+    return int(app.eval(f"{_count_js(layer, expression)} return n;"))
 
 
 def log_messages(app: QFieldApp, tag: str | None = None) -> list[str]:
@@ -684,6 +687,19 @@ def change_geometry(app: QFieldApp, layer: str, expression: str, wkt: str) -> No
       if (!ok) throw new Error('changeGeometry failed');
     """)
     time.sleep(0.3)
+
+
+def delete_feature(app: QFieldApp, layer: str, expression: str) -> None:
+    """Delete the first matching feature through its form's menu and confirm.
+
+    The form opens in read mode, `Delete Feature` is an entry of its menu.
+    """
+    before = feature_count(app, layer)
+    open_feature_form(app, layer, expression, edit=False)
+    tap_icon(app, FORM_MENU_ICON, FEATURE_FORM)
+    tap_text(app, "Delete Feature")
+    tap_text(app, "OK")
+    app.wait(f"{_count_js(layer, '')} return n === {before - 1};", 15)
 
 
 def import_js(app: QFieldApp, path: Path, name: str) -> None:
