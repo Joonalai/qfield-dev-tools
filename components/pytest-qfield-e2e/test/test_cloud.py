@@ -83,3 +83,14 @@ def test_edit_travels_from_one_device_to_another(
     device_b = qfieldcloud_device(cloud_project, SURVEYOR_B)
     rows = actions.features(device_b, POINTS, ["text_field"], "fid = 1")
     assert rows == [{"text_field": text}]
+
+
+def test_synchronize_reports_the_deltas(
+    cloud_project: str, qfieldcloud_device: Callable[..., QFieldApp]
+) -> None:
+    device = qfieldcloud_device(cloud_project, SURVEYOR_A)
+    actions.edit_in_form(device, POINTS, "fid = 1", "text_field", "synced")
+
+    result = actions.synchronize(device, cloud_project)
+
+    assert result == {"deltas": 1, "delta_status": "applied"}
