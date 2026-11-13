@@ -92,19 +92,24 @@ Other methods: `click`, `long_press`, `drag`, `type_text`, `key`, `screenshot`,
 
 ### Actions
 
-`qfield_driver.actions` has user level helpers built on QField's own item
-names: `tap_object`, `tap_text`, `tap_icon`, `type_into`, `expand_drawer`,
-`open_project`, `frame_map`, `tap_map`, `long_press_map`, `set_active_layer`, `digitize_point`,
-`open_feature_form`, `edit_in_form`, `delete_feature`, `current_form`, `set_field`,
-`choose_option`, `toggle_switch`,
-`tick_item`, `search_and_tick`, `attach_photo`, `open_related`, `save_form`,
-`save_open_form` (also a digitized feature's form),
-`wait_visible`, `wait_for_text` (toasts), `frame_and_tap`, `scan_code` (QField's
-code reader), `features`, `geometries`, `feature_count`, `add_feature`,
-`change_geometry`, `evaluate_expression`, `import_js` (call a plugin's JS module),
-`highlighted_wkt`, `log_messages`, `wait_for_message`, and the cloud steps `login`,
-`download_project`, `push` and `synchronize`. `qfield_driver.wkt` has `length`
-and `interpolate`, which QField does not expose to QML.
+`qfield_driver.actions` has user level helpers built on QField's own item names:
+
+- Tapping and typing: `tap_object`, `tap_text`, `tap_icon`, `type_into`,
+  `expand_drawer`, `wait_visible`, `wait_for_text` (toasts), `scan_code` (QField's
+  code reader).
+- Project and map: `open_project`, `frame_map`, `tap_map`, `long_press_map`,
+  `frame_and_tap`, `set_active_layer`, `digitize_point`.
+- Forms: `open_feature_form`, `edit_in_form`, `current_form` (the open form, also a
+  digitized feature's), `set_field`, `choose_option`, `toggle_switch`, `tick_item`,
+  `search_and_tick`, `attach_photo`, `open_related`, `save_form`, `save_open_form`,
+  `delete_feature`.
+- Data: `features`, `geometries`, `feature_count`, `add_feature`, `change_geometry`,
+  `evaluate_expression`, `highlighted_wkt`, `import_js` (call a plugin's JS module).
+- Messages: `log_messages`, `wait_for_message`.
+- QFieldCloud: `login`, `download_project`, `push`, and `synchronize`, which returns
+  the delta count and status.
+
+`qfield_driver.wkt` has `length` and `interpolate`, which QField does not expose to QML.
 
 Differences from QGIS based stubs to expect: a NULL integer attribute reads as `0`
 in QField JS, `ExpressionEvaluator` hands back text, plugin popups animate open and
