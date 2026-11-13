@@ -18,6 +18,7 @@
 
 
 import json
+import re
 import subprocess
 from pathlib import Path
 
@@ -114,3 +115,70 @@ def test_own_checkout_runs_without_fetching(
 def test_own_checkout_must_be_qfieldcloud(tmp_path: Path) -> None:
     with pytest.raises(FileNotFoundError, match="Not a QFieldCloud checkout"):
         QFieldCloudStack.local(tmp_path, tmp_path / "cache")
+
+
+def _git(repo: Path, *args: str) -> None:
+    identity = ("-c", "user.name=test", "-c", "user.email=test@localhost")
+    subprocess.run(  # noqa: S603 fixed git arguments
+        ["git", "-C", str(repo), *identity, *args],  # noqa: S607 git from PATH
+        check=True,
+        capture_output=True,
+    )
+
+
+def test_source_version_follows_commits_and_edits(tmp_path: Path) -> None:
+    """Every commit and every uncommitted edit names a new version."""
+    (tmp_path / "app.py").write_text("one\n")
+    _git(tmp_path, "init")
+    _git(tmp_path, "add", ".")
+    _git(tmp_path, "commit", "-m", "one")
+    _git(tmp_path, "tag", "v1.0")
+    release = stack_module.source_version(tmp_path, "v1.0")
+    (tmp_path / "app.py").write_text("two\n")
+    edited = stack_module.source_version(tmp_path, "v1.0")
+    (tmp_path / "app.py").write_text("three\n")
+    edited_again = stack_module.source_version(tmp_path, "v1.0")
+    _git(tmp_path, "commit", "-am", "three")
+    committed = stack_module.source_version(tmp_path, "v1.0")
+
+    assert release == "v1.0"
+    assert edited.startswith("v1.0-dirty-")
+    assert edited_again.startswith("v1.0-dirty-")
+    assert edited != edited_again
+    assert re.fullmatch(r"v1\.0-1-g[0-9a-f]+", committed)
+
+
+def test_source_version_without_git_is_the_ref(tmp_path: Path) -> None:
+    assert stack_module.source_version(tmp_path, "local-My Cloud") == "local-My_Cloud"
+
+
+def test_images_are_tagged_with_the_version(
+    stack: QFieldCloudStack, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A new version builds again, and older version tags are dropped."""
+    images = {"pytest_qfieldcloud_v1-app": {"latest", "old"}}
+
+    def docker(*args: str) -> subprocess.CompletedProcess[str]:
+        # The image named last is the one acted on, the target of `tag`.
+        command, image = args[1], args[-1]
+        repository, _, tag = image.partition(":")
+        tags = images.setdefault(repository, set())
+        stdout, returncode = "", 0
+        if command == "inspect":
+            returncode = int((tag or "latest") not in tags)
+        elif command == "tag":
+            tags.add(tag)
+        elif command == "ls":
+            stdout = "\n".join(tags)
+        elif command == "rm":
+            tags.discard(tag)
+        return subprocess.CompletedProcess(args, returncode, stdout, "")
+
+    monkeypatch.setattr(stack, "_docker", docker)
+
+    missing = stack._images_missing(["app"], "new")
+    stack._tag_images(["app"], "new")
+
+    assert missing == ["app"]
+    assert stack._images_missing(["app"], "new") == []
+    assert images["pytest_qfieldcloud_v1-app"] == {"latest", "new"}
