@@ -142,7 +142,20 @@ admin.package(project_id)
 ```
 
 `QFieldCloudStack.local(checkout, cache_dir)` runs a QFieldCloud checkout of your
-own instead. The stack writes its `.env` and compose overrides into that checkout.
+own instead. The stack writes its `.env.<project>` and compose overrides into that checkout.
+`QFieldCloudStack.with_offset(ref, cache_dir, n)` moves every port up by `n` from the
+defaults and suffixes the default compose project with `-n`; `local` takes an `offset`
+argument too. Explicit ports and `name` win, offset 0 is the plain stack. Runs that
+share one stack share its one admin token, and one run's login invalidates the other's
+(`Token has expired`), so parallel worktrees need distinct offsets. Stacks of one ref
+share the checkout but not its configuration: each project has its own env file and
+services override, and every compose call names them. Offsets that are multiples of 10
+up to 50 never collide, others can: the stack uses host ports 8109, 8113, 8180 (with
+8182 to 8184 for the mail test server), 8432 and 8543 at offset 0, so offsets 1 to 4,
+67 to 75 or 111 apart, for example, share one. Each offset also builds its own
+`<project>-<service>` images, so its first start is a long build and takes extra GB.
+`qfdc up` and `qfdc down` take `--port-offset` (env `QFIELDCLOUD_PORT_OFFSET`), and
+`qfdc prune` removes the offset stacks of a stale ref too.
 `stack.ensure_user(name, password)` creates a user, and the client covers projects,
 collaborators, files, jobs and deltas, with `wait_for_jobs` and `wait_for_deltas`.
 
