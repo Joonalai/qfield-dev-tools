@@ -49,6 +49,21 @@ uv sync --package <component> --all-groups                  # add --all-extras f
   [qfield-driver requirements](components/qfield-driver/README.md#requirements). Cloud tests also
   need docker or rootless podman with `docker compose`.
 
+## Make
+
+The `Makefile` wraps the commands below. `make` lists the targets.
+
+```bash
+make venv            # .venv on the system Python
+make test            # every suite except the cloud tests, each synced first
+make test-e2e ARGS="-k reuse -x"
+make test-cloud      # slow, builds a local QFieldCloud
+make lint
+```
+
+Each test target syncs its component into the shared `.venv` first, `test-qfield` also adds the
+PyQt6 wheel. `SYSTEM_PYTHON` (default `/usr/bin/python3`) picks the Python QGIS uses.
+
 ## Tests
 
 Always run offscreen so no windows open over your work. From the repository root:
@@ -73,6 +88,13 @@ Command line helpers, after syncing the component:
 
 - `qff` (alias of `qfield-fetch`): `qff appimage 4.2.9`, `qff source 4.2.9`, `qff list`, `qff remove source v4.2.9`
 - `qfdc` (alias of `qfield-driver-cloud`): `qfdc ref`, `qfdc up`, `qfdc prune`, `qfdc down`
+
+Run qfield-mcp from the checkout, `--no-sync` keeps the server from syncing the shared `.venv`:
+
+```bash
+make sync-qfield-mcp
+claude mcp add qfield -- uv run --no-sync --directory /path/to/qfield-dev-tools/components/qfield-mcp qfield-mcp
+```
 
 ## Safety
 
