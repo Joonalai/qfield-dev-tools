@@ -15,7 +15,7 @@ Shared skills live in `.agents/skills/`, managed by the [nlsfi agent-instruction
 
 ## Workspace layout
 
-The repo is a uv workspace. Every directory under `components/` is a member; `pytest-qfield` is the first.
+The repo is a uv workspace. Every directory under `components/` is a member: `qfield-fetch` (downloads QField AppImages and sources, used by the others) and `pytest-qfield` (stub based plugin tests on QGIS).
 
 - Not all components can be installed at the same time, so the root `pyproject.toml` never depends on a component. Sync one at a time: `uv sync --package <component> --all-groups`. Plain `--package` drops the root's `dev`/`lint` groups.
 - The root holds what all components share: the `dev` (pytest plugins) and `lint` groups, and the ruff and flake8 config. Package metadata, pytest config and semantic-release config live in each component's `pyproject.toml`.

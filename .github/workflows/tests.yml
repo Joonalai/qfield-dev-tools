@@ -5,6 +5,7 @@ on:
     branches: [ main ]
     paths:
       - 'components/pytest-qfield/**'
+      - 'components/qfield-fetch/**'
       - 'pyproject.toml'
       - '.github/workflows/tests.yml'
       - 'uv.lock'
@@ -12,11 +13,23 @@ on:
     branches: [ main ]
     paths:
       - 'components/pytest-qfield/**'
+      - 'components/qfield-fetch/**'
       - 'pyproject.toml'
       - '.github/workflows/tests.yml'
       - 'uv.lock'
 
 jobs:
+  fetch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - name: Install uv
+        uses: astral-sh/setup-uv@v6
+      - name: Run tests
+        run: |
+          uv sync --package qfield-fetch --all-groups
+          uv run --package qfield-fetch pytest -v -c components/qfield-fetch/pyproject.toml components/qfield-fetch/test
+
   pytest:
     runs-on: ubuntu-latest
     container:
