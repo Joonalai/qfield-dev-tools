@@ -6,9 +6,17 @@ on:
     branches:
       - main
 
+# Queue runs, each release pushes to main and a later run must see it
+concurrency:
+  group: release
+  cancel-in-progress: false
+
 jobs:
-  build:
-    name: Build Release
+  # Components are released one after another in dependency order in a single job,
+  # because each release pushes a commit to the same branch. A component is released
+  # when commits touching it include feat, fix or build commits.
+  release:
+    name: Release components
     runs-on: ubuntu-latest
     environment:
       name: pypi
@@ -20,24 +28,11 @@ jobs:
         uses: actions/checkout@v6
         with:
           fetch-depth: 0
-      - name: Release with semantic-release
-        id: release
-        uses: python-semantic-release/python-semantic-release@v10.5.3
-        with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-          vcs_release: false
-          directory: components/pytest-qfield
-
-      # Publsh to PyPI only if the release was made
       - name: Install uv
-        if: steps.release.outputs.released == 'true'
-        uses: astral-sh/setup-uv@v5
-      - name: Install Python
-        if: steps.release.outputs.released == 'true'
-        run: uv python install 3.13
-      - name: Publish package (dry run)
-        if: steps.release.outputs.released == 'true'
-        run: uv publish --dry-run dist/*
-      - name: Publish package to PyPI
-        if: steps.release.outputs.released == 'true'
-        run: uv publish dist/*
+        uses: astral-sh/setup-uv@v6
+
+      - name: Release pytest-qfield
+        uses: ./.github/actions/release-component
+        with:
+          component: pytest-qfield
+          github_token: ${{ secrets.GITHUB_TOKEN }}
