@@ -608,12 +608,14 @@ source = { editable = "components/pytest-qfield" }
 dependencies = [
     { name = "pytest-qgis" },
     { name = "pytest-qt" },
+    { name = "qfield-fetch" },
 ]
 
 [package.metadata]
 requires-dist = [
     { name = "pytest-qgis", specifier = ">=3.0.1" },
     { name = "pytest-qt" },
+    { name = "qfield-fetch", editable = "components/qfield-fetch" },
 ]
 
 [[package]]

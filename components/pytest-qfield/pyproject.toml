@@ -22,11 +22,15 @@ classifiers = [
 dependencies = [
     "pytest-qt",
     "pytest-qgis>=3.0.1",
+    "qfield-fetch",
 ]
 
 [project.urls]
 homepage = "https://github.com/Joonalai/qfield-dev-tools"
 repository = "https://github.com/Joonalai/qfield-dev-tools"
+
+[tool.uv.sources]
+qfield-fetch = { workspace = true }
 
 [build-system]
 requires = ["uv_build>=0.10.9,<0.14.0"]
