@@ -59,7 +59,7 @@ form.state = "FeatureFormEdit";
 
 ```python
 def test_form_was_opened(qfield_feature_list_form_stub):
-    (recorded_layer, recorded_filter), = (
+    ((recorded_layer, recorded_filter),) = (
         qfield_feature_list_form_stub.model.set_features_calls
     )
     assert recorded_layer.name == "points"
@@ -73,6 +73,7 @@ Override the relevant fixture to inject custom values (e.g. a fixed position):
 # conftest.py
 import pytest
 from pytest_qfield.stub_interface.qfield_stubs import QFieldPositioningStub
+
 
 @pytest.fixture
 def qfield_positioning_stub() -> QFieldPositioningStub:
@@ -95,6 +96,7 @@ The stub is auto-attached to the iface as `qml_map_canvas` and is also exposed v
 
 ```python
 from qgis.core import QgsPointXY, QgsRectangle
+
 
 def test_pick_end_point(qfield_bot, qgis_canvas):
     qgis_canvas.show()
@@ -141,10 +143,12 @@ import pytest
 from PyQt6.QtCore import pyqtSlot
 from pytest_qfield.stub_interface.qfield_stubs import QFieldStringUtilsStub
 
+
 class DeterministicStringUtils(QFieldStringUtilsStub):
     @pyqtSlot(result=str)
     def createUuid(self) -> str:
         return "{00000000-0000-0000-0000-000000000000}"
+
 
 @pytest.fixture
 def qfield_string_utils_stub() -> QFieldStringUtilsStub:
@@ -159,9 +163,7 @@ You can also use `qfield_qml_extra_context_properties` to inject additional obje
 ```python
 @pytest.fixture
 def qfield_qml_extra_context_properties():
-    return {
-        "myCustomObject": MyCustomObject()
-    }
+    return {"myCustomObject": MyCustomObject()}
 ```
 
 Other overridable fixtures include:

@@ -59,24 +59,20 @@ QtObject {{
 
 
 class JsQObject(Protocol):
-    """
-    Protocol for JavaScript QObject with a call method.
-    """
+    """Protocol for JavaScript QObject with a call method."""
 
     @staticmethod
     def call(*args: Any) -> Any:  # noqa: ANN401
-        """
-        Function to call the JavaScript function with the given parameters.
+        """Call the JavaScript function with the given parameters.
+
         :param args: Parameters to call the function with.
-        :return: A possible return value from the function
+        :return: A possible return value from the function.
         """
         ...
 
 
 class QFieldBot:
-    """
-    Helper class for testing QField QML files.
-    """
+    """Helper class for testing QField QML files."""
 
     def __init__(
         self,
@@ -95,17 +91,14 @@ class QFieldBot:
         self._plugin_root_object: QObject | None = None
 
     def show_window(self) -> None:
-        """
-        Show the QField application window.
-        """
+        """Show the QField application window."""
         self.iface.show()
         QgsProject.instance().layersAdded.connect(
             self.sync_canvas_layers_to_project_layer_tree
         )
 
     def open_project(self, project_file: Path) -> None:
-        """
-        Open a QField project file.
+        """Open a QField project file.
 
         If you load the plugin before opening the project, remember to load it with
         emit_load_project_ended=False.
@@ -119,7 +112,7 @@ class QFieldBot:
             )
         try:
             with self.qtbot.waitSignal(QgsProject.instance().readProject):
-                assert QgsProject.instance().read(str(project_file))
+                assert QgsProject.instance().read(str(project_file))  # noqa: S101
             self.sync_canvas_layers_to_project_layer_tree()
             self.emit_load_project_ended()
         finally:
@@ -130,11 +123,10 @@ class QFieldBot:
     def load_plugin(
         self,
         qfield_plugin_qml_file: Path,
-        raise_if_warnings: bool = True,
-        emit_load_project_ended: bool = True,
+        raise_if_warnings: bool = True,  # noqa: FBT001, FBT002
+        emit_load_project_ended: bool = True,  # noqa: FBT001, FBT002
     ) -> None:
-        """
-        Load a QField plugin QML file into the QML engine and wait for it to be loaded.
+        """Load a QField plugin QML file and wait for it to be loaded.
 
         :param qfield_plugin_qml_file: Path to the QML file to load.
         :param raise_if_warnings: Whether to raise an exception
@@ -142,9 +134,8 @@ class QFieldBot:
         :param emit_load_project_ended: Whether to emit the loadProjectEnded
                 signal on iface.
         """
-
         self._plugin_root_object = self.load_qml(
-            qfield_plugin_qml_file, raise_if_warnings
+            qfield_plugin_qml_file, raise_if_warnings=raise_if_warnings
         )
         self.iface.set_qml_root(self._plugin_root_object)
         self._plugin_loaded = True
@@ -162,8 +153,8 @@ class QFieldBot:
         params: list[str],
         extra_files: list[Path] | None = None,
     ) -> JsQObject:
-        """
-        Load js function from file as a QObject with function "call".
+        """Load js function from file as a QObject with function "call".
+
         Call object.call to execute the function.
 
         :param js_file: Path to the JavaScript file to load.
@@ -172,8 +163,7 @@ class QFieldBot:
         :param extra_files: List of extra files to load.
         :return: JsQObject with the loaded function
         """
-
-        for file in [js_file, *(extra_files if extra_files else [])]:
+        for file in [js_file, *(extra_files or [])]:
             shutil.copy(file, self._tmp_path / file.name)
         qml_code = QML_JS_QOBJECT_TEMPLATE.format(
             js_file_name=js_file.name, function_name=name, params=", ".join(params)
@@ -186,8 +176,9 @@ class QFieldBot:
         component.loadUrl(QUrl.fromLocalFile(str(main_qml)))
         js_object = component.create()
         if js_object is None:
+            msg = "Could not create QObject with js function: "
             raise ValueError(
-                "Could not create QObject with js function: ",
+                msg,
                 [error.toString() for error in component.errors()],
             )
         return cast("JsQObject", js_object)
@@ -196,7 +187,8 @@ class QFieldBot:
         self._ensure_plugin_loaded()
         child = self._get_plugin_root_object().findChild(QQuickItem, object_name)
         if not child:
-            raise RuntimeError(f"QML object {object_name} not found!")
+            msg = f"QML object {object_name} not found!"
+            raise RuntimeError(msg)
         return child
 
     def click_item(
@@ -210,16 +202,15 @@ class QFieldBot:
         # Pointer handlers drop event points outside the window, so a click
         # there would silently hit nothing.
         if not QRectF(0, 0, window.width(), window.height()).contains(scene_pos):
-            raise RuntimeError(
+            msg = (
                 f"Center of {item.objectName() or item} at {scene_pos} is outside "
                 f"the {window.width()}x{window.height()} QML window"
             )
+            raise RuntimeError(msg)
         self.qtbot.mouseClick(window, mouse_button, pos=scene_pos.toPoint())
 
     def click_map_at(self, crs_point: QgsPointXY, click_type: int = 0) -> None:
-        """
-        Emit ``clicked`` on the QML map canvas stub for a tap at the given
-        project-CRS coordinate.
+        """Emit ``clicked`` on the map canvas stub at a project-CRS coordinate.
 
         The screen point is computed from the live
         ``qgis_canvas.mapSettings().mapToPixel()`` transform, so a plugin
@@ -236,10 +227,9 @@ class QFieldBot:
         )
 
     def long_press_map_at(self, crs_point: QgsPointXY, click_type: int = 0) -> None:
-        """
-        Emit ``confirmedClicked`` (QField's long-press gesture) at the given
-        project-CRS coordinate. See :meth:`click_map_at` for transform and
-        setup details.
+        """Emit ``confirmedClicked`` (long-press) at a project-CRS coordinate.
+
+        See :meth:`click_map_at` for transform and setup details.
         """
         self.iface.qml_map_canvas.confirmedClicked.emit(
             self._crs_to_screen(crs_point), click_type
@@ -257,8 +247,7 @@ class QFieldBot:
         feature_id: int,
         mode: str = "view",
     ) -> None:
-        """
-        Drive the ``featureForm`` stub as QField does when a feature is opened.
+        """Drive the ``featureForm`` stub as QField does when a feature is opened.
 
         Navigates the form's model to ``feature_id`` on ``layer``, focuses the
         matched row, switches ``state`` to the read-only ``"FeatureForm"`` view
@@ -270,10 +259,11 @@ class QFieldBot:
         try:
             state = _FEATURE_FORM_STATE_BY_MODE[mode]
         except KeyError:
-            raise ValueError(
+            msg = (
                 f"Unknown feature form mode {mode!r}; expected one of "
                 f"{sorted(_FEATURE_FORM_STATE_BY_MODE)}"
-            ) from None
+            )
+            raise ValueError(msg) from None
         form = self._feature_form_stub()
         form.model.setFeatures(QgsVectorLayerStub(layer), f"$id = {feature_id}")
         form.selection.focusedItem = 0  # type: ignore[method-assign]
@@ -281,9 +271,10 @@ class QFieldBot:
         form.visible = True  # type: ignore[method-assign]
 
     def open_overlay_form(self, layer: "QgsVectorLayer", feature_id: int) -> None:
-        """
-        Open the ``overlayFeatureFormDrawer`` stub for ``feature_id`` on
-        ``layer``, as QField does after digitizing a feature. Sets ``opened``
+        """Open the ``overlayFeatureFormDrawer`` stub for a feature.
+
+        QField does this for ``feature_id`` on ``layer`` after digitizing a
+        feature. Sets ``opened``
         to ``True`` and records the shown feature in ``shown_features`` so tests
         can assert which feature was opened; the ``openedChanged`` notify signal
         fires so bound plugin QML reacts.
@@ -293,10 +284,10 @@ class QFieldBot:
         drawer.opened = True  # type: ignore[method-assign]
 
     def close_forms(self) -> None:
-        """
-        Dismiss both feature-form surfaces: hide ``featureForm``
-        (``visible = False``, ``state = "Hidden"``) and close
-        ``overlayFeatureFormDrawer`` (``opened = False``).
+        """Dismiss both feature-form surfaces.
+
+        Hides ``featureForm`` (``visible = False``, ``state = "Hidden"``) and
+        closes ``overlayFeatureFormDrawer`` (``opened = False``).
         """
         form = self._feature_form_stub()
         form.visible = False  # type: ignore[method-assign]
@@ -306,20 +297,23 @@ class QFieldBot:
     def _feature_form_stub(self) -> "QFieldFeatureListFormStub":
         form = self.iface.findItemByObjectName("featureForm")
         if form is None:
-            raise RuntimeError("featureForm stub is not registered on the iface")
+            msg = "featureForm stub is not registered on the iface"
+            raise RuntimeError(msg)
         return cast("QFieldFeatureListFormStub", form)
 
     def _overlay_form_stub(self) -> "QFieldOverlayFeatureFormDrawerStub":
         drawer = self.iface.findItemByObjectName("overlayFeatureFormDrawer")
         if drawer is None:
-            raise RuntimeError(
-                "overlayFeatureFormDrawer stub is not registered on the iface"
-            )
+            msg = "overlayFeatureFormDrawer stub is not registered on the iface"
+            raise RuntimeError(msg)
         return cast("QFieldOverlayFeatureFormDrawerStub", drawer)
 
-    def load_qml(self, qml_file: Path, raise_if_warnings: bool = True) -> QObject:
-        """
-        Load a QML file into the QML engine and wait for it to be loaded.
+    def load_qml(
+        self,
+        qml_file: Path,
+        raise_if_warnings: bool = True,  # noqa: FBT001, FBT002
+    ) -> QObject:
+        """Load a QML file into the QML engine and wait for it to be loaded.
 
         :param qml_file: Path to the QML file to load.
         :param raise_if_warnings: Whether to raise an exception
@@ -329,7 +323,8 @@ class QFieldBot:
         initial_root_count = len(self._qml_engine.rootObjects())
 
         if not qml_file.exists():
-            raise FileNotFoundError(f"QML file {qml_file} does not exist!")
+            msg = f"QML file {qml_file} does not exist!"
+            raise FileNotFoundError(msg)
         with self.qtbot.waitSignal(self._qml_engine.objectCreated):
             self._qml_engine.load(str(qml_file))
 
@@ -340,10 +335,12 @@ class QFieldBot:
             in (QtMsgType.QtWarningMsg, QtMsgType.QtCriticalMsg, QtMsgType.QtFatalMsg)
         ]
         if raise_if_warnings and new_logs:
-            raise ValueError(f"QML file {qml_file} failed to load:\n{new_logs}")
+            msg = f"QML file {qml_file} failed to load:\n{new_logs}"
+            raise ValueError(msg)
 
         if not len(self._qml_engine.rootObjects()) > initial_root_count:
-            raise ValueError(f"QML file {qml_file} did not load successfully!")
+            msg = f"QML file {qml_file} did not load successfully!"
+            raise ValueError(msg)
 
         return self._qml_engine.rootObjects()[-1]
 
@@ -354,16 +351,17 @@ class QFieldBot:
 
     def _ensure_plugin_loaded(self) -> None:
         if not self._plugin_loaded:
-            raise ValueError("Plugin not loaded yet!")
+            msg = "Plugin not loaded yet!"
+            raise ValueError(msg)
 
     def _get_plugin_root_object(self) -> "QObject":
         if self._plugin_root_object is None:
-            raise ValueError("Plugin not loaded yet!")
+            msg = "Plugin not loaded yet!"
+            raise ValueError(msg)
         return self._plugin_root_object
 
     def sync_canvas_layers_to_project_layer_tree(self, *_: Any) -> None:  # noqa: ANN401
-        """
-        Set map canvas layers in project layer tree order.
+        """Set map canvas layers in project layer tree order.
 
         This is alternative way compared to settings up the QgsLayerTreeMapCanvasBridge,
         which does not seem to cope well with web map services.

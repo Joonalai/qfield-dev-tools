@@ -16,6 +16,7 @@
 # You should have received a copy of the GNU General Public License
 # along with pytest-qfield.  If not, see <https://www.gnu.org/licenses/>.
 
+import shutil
 import subprocess
 from pathlib import Path
 from tempfile import TemporaryDirectory
@@ -54,12 +55,17 @@ def main() -> None:
 
         temp_output = Path(temp_dir) / "resources.py"
 
-        subprocess.run(
-            ["rcc", "-g", "python", str(qrc_file), "-o", str(temp_output)], check=True
+        rcc = shutil.which("rcc")
+        if rcc is None:
+            msg = "rcc not found in PATH"
+            raise RuntimeError(msg)
+        subprocess.run(  # noqa: S603 the arguments are built here, not user input
+            [rcc, "-g", "python", str(qrc_file), "-o", str(temp_output)], check=True
         )
 
         if not temp_output.exists():
-            raise ValueError(f"Output path {temp_output} was not created!")
+            msg = f"Output path {temp_output} was not created!"
+            raise ValueError(msg)
 
         resources_content = temp_output.read_text()
 

@@ -105,9 +105,10 @@ def test_form_lifecycle_drives_qml_binding(
     layer_points: "QgsVectorLayer",
     qgs_project_stub: "QgsProjectStub",
 ):
-    """
-    A plugin binding `aFormIsOpen` to the two stubs (as the myplugin plugin does)
-    must flip as the bot opens and closes forms. This is the surface that lets
+    """A plugin binding `aFormIsOpen` to both form stubs must follow the bot.
+
+    As the myplugin plugin does, the binding must flip as the bot opens and
+    closes forms. This is the surface that lets
     the read-only `"FeatureForm"` view case be tested at all.
     """
     probe_qml = tmp_path / "a_form_is_open_probe.qml"

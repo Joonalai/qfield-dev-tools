@@ -23,8 +23,9 @@ except ImportError as e:
 
     # The wheel must bundle the system Qt minor version, as QGIS uses its private API
     qt_minor = QT_VERSION_STR.rsplit(".", 1)[0]
-    raise ImportError(
+    msg = (
         f"{e.msg}. The PyQt6 of your QGIS installation lacks the QML bindings, "
         f"install them matching Qt {QT_VERSION_STR} with: "
         f'pip install "PyQt6=={qt_minor}.*"'
-    ) from e
+    )
+    raise ImportError(msg) from e

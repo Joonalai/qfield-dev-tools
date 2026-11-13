@@ -15,8 +15,7 @@
 #
 # You should have received a copy of the GNU General Public License
 # along with pytest-qfield.  If not, see <https://www.gnu.org/licenses/>.
-"""
-Stub implementations of QField's QML-facing classes.
+"""Stub implementations of QField's QML-facing classes.
 
 See :mod:`pytest_qfield.stub_interface.qgis_stubs` for the
 ``CppOwnership`` pin + ``_pinned_*_stubs`` retention convention used by slots
@@ -43,8 +42,7 @@ if TYPE_CHECKING:
 
 
 class QFieldAppInterfaceStub(QObject):
-    """
-    Stub implementation of AppInterface.
+    """Stub implementation of AppInterface.
 
     https://api.qfield.org/QField/classAppInterface/
     """
@@ -75,7 +73,8 @@ class QFieldAppInterfaceStub(QObject):
     @property
     def qml_main_window(self) -> QObject:
         if self._qml_main_window is None:
-            raise ValueError("Add QML main window via set_main_window method first!")
+            msg = "Add QML main window via set_main_window method first!"
+            raise ValueError(msg)
         return self._qml_main_window
 
     def set_main_window(
@@ -86,24 +85,29 @@ class QFieldAppInterfaceStub(QObject):
 
     def show(self) -> None:
         if self._qgis_main_window is None:
-            raise ValueError("Add mainWindow via set_main_window method first!")
+            msg = "Add mainWindow via set_main_window method first!"
+            raise ValueError(msg)
         self._qgis_main_window.show()
 
     def set_qml_root(self, root: QObject) -> None:
         if not isinstance(root, QQuickItem):
-            raise TypeError(f"Unsupported root type: {type(root)}")
+            msg = f"Unsupported root type: {type(root)}"
+            raise TypeError(msg)
 
         scene_root = self.qml_main_window.findChild(QObject, "host")
         if scene_root is None:
-            raise RuntimeError("Could not find host item in main window")
+            msg = "Could not find host item in main window"
+            raise RuntimeError(msg)
         if not isinstance(scene_root, QQuickItem):
-            raise TypeError(f"Host is not a QQuickItem: {type(scene_root)}")
+            msg = f"Host is not a QQuickItem: {type(scene_root)}"
+            raise TypeError(msg)
 
         root.setParentItem(scene_root)
         # Track later resizes (e.g. when the window is shown), not just the
         # host size at load time.
         if not QQmlProperty.write(root, "anchors.fill", scene_root):
-            raise RuntimeError("Could not anchor plugin root to host item")
+            msg = "Could not anchor plugin root to host item"
+            raise RuntimeError(msg)
 
     @pyqtSlot(result=QObject)
     def mainWindow(self) -> QObject:
@@ -117,14 +121,13 @@ class QFieldAppInterfaceStub(QObject):
     def addItemToPluginsToolbar(self, _item: "QQuickItem") -> None:
         toolbar_row = self.qml_main_window.findChild(QObject, "pluginsToolbarRow")
         if toolbar_row is None:
-            raise RuntimeError("Plugins toolbar row not found")
+            msg = "Plugins toolbar row not found"
+            raise RuntimeError(msg)
         _item.setSize(QSizeF(48, 48))
         _item.setParentItem(toolbar_row)
 
     def register_named_item(self, object_name: str, item: QObject) -> None:
-        """
-        Register a QObject so it can later be located via
-        ``findItemByObjectName``.
+        """Register a QObject so ``findItemByObjectName`` can locate it.
 
         Mirrors how QField builds its item registry by ``objectName``. Tests
         usually do not call this directly; the ``pytest-qfield`` plugin
@@ -141,8 +144,7 @@ class QFieldAppInterfaceStub(QObject):
 
     @pyqtSlot(str, result=QObject)
     def findItemByObjectName(self, name: str) -> QObject | None:
-        """
-        Stub implementation of ``AppInterface.findItemByObjectName``.
+        """Stub implementation of ``AppInterface.findItemByObjectName``.
 
         https://api.qfield.org/QField/classAppInterface/
 
@@ -197,8 +199,7 @@ class QFieldPlatformUtilitiesStub(QObject):
 
 
 class QFieldStringUtilsStub(QObject):
-    """
-    StringUtils stub.
+    """StringUtils stub.
 
     https://api.qfield.org/QField/classStringUtils/
     """
@@ -209,8 +210,7 @@ class QFieldStringUtilsStub(QObject):
 
 
 class QFieldGeometryUtilsStub(QObject):
-    """
-    GeometryUtils stub
+    """GeometryUtils stub.
 
     https://api.qfield.org/QField/classGeometryUtils/
     """
@@ -219,7 +219,7 @@ class QFieldGeometryUtilsStub(QObject):
         super().__init__(parent=parent)
         self._pinned_geometry_stubs: list[QgsGeometryStub] = []
 
-    # TODO: add point method
+    # TODO(Joonalai): add point method
 
     @pyqtSlot(str, result=QObject)
     def createGeometryFromWkt(self, wkt: str) -> QgsGeometryStub:
@@ -233,8 +233,7 @@ class QFieldGeometryUtilsStub(QObject):
 
 
 class QFieldLayerUtilsStub(QObject):
-    """
-    LayerUtils stub.
+    """LayerUtils stub.
 
     https://api.qfield.org/QField/classLayerUtils
     """
@@ -330,9 +329,7 @@ class FeatureIteratorStub(QObject):
 
 
 class QFieldProjectedPositionStub(QObject):
-    """
-    Stub for the QgsPoint returned by ``Positioning.projectedPosition``.
-    """
+    """Stub for the QgsPoint returned by ``Positioning.projectedPosition``."""
 
     def __init__(
         self,
@@ -354,8 +351,7 @@ class QFieldProjectedPositionStub(QObject):
 
 
 class QFieldPositioningStub(QObject):
-    """
-    Stub implementation for Positioning, the QML ``positionSource`` item.
+    """Stub implementation for Positioning, the QML ``positionSource`` item.
 
     https://github.com/opengisch/QField/blob/master/src/core/positioning/positioning.h
     """
@@ -381,8 +377,7 @@ class QFieldPositioningStub(QObject):
 
 
 class QFieldGeometryWrapperStub(QObject):
-    """
-    Stub implementation for GeometryWrapper.
+    """Stub implementation for GeometryWrapper.
 
     https://github.com/opengisch/QField/blob/master/src/core/utils/geometrywrapper.h
     """
@@ -424,8 +419,7 @@ class QFieldGeometryWrapperStub(QObject):
 
 
 class QFieldGeometryHighlighterStub(QObject):
-    """
-    Stub implementation for GeometryHighlighter.
+    """Stub implementation for GeometryHighlighter.
 
     https://github.com/opengisch/QField/blob/master/src/core/utils/geometryhighlighter.h
     """
@@ -471,8 +465,7 @@ class QFieldGeometryHighlighterStub(QObject):
 
 
 class QFieldMultiFeatureListModelStub(QObject):
-    """
-    Stub implementation of the ``model`` exposed by ``FeatureListForm``.
+    """Stub implementation of the ``model`` exposed by ``FeatureListForm``.
 
     https://github.com/opengisch/QField/blob/master/src/core/multifeaturelistmodel.h
 
@@ -492,8 +485,7 @@ class QFieldMultiFeatureListModelStub(QObject):
 
 
 class QFieldFeatureListModelSelectionStub(QObject):
-    """
-    Stub implementation of the ``selection`` exposed by ``FeatureListForm``.
+    """Stub implementation of the ``selection`` exposed by ``FeatureListForm``.
 
     https://github.com/opengisch/QField/blob/master/src/core/featurelistmodelselection.h
 
@@ -561,8 +553,7 @@ class QFieldFeatureListModelSelectionStub(QObject):
 
 
 class QFieldFeatureListFormStub(QObject):
-    """
-    Stub implementation for ``FeatureListForm`` (objectName ``"featureForm"``).
+    """Stub implementation for ``FeatureListForm`` (objectName ``"featureForm"``).
 
     https://github.com/opengisch/QField/blob/master/src/qml/FeatureListForm.qml
 
@@ -626,8 +617,7 @@ class QFieldFeatureListFormStub(QObject):
 
 
 class QFieldOverlayFeatureFormDrawerStub(QObject):
-    """
-    Stub implementation for ``overlayFeatureFormDrawer``.
+    """Stub implementation for ``overlayFeatureFormDrawer``.
 
     https://github.com/opengisch/QField/blob/master/src/qml/qgismobileapp.qml
 
@@ -663,8 +653,7 @@ class QFieldOverlayFeatureFormDrawerStub(QObject):
 
 
 class QFieldMapSettingsStub(QObject):
-    """
-    Stub implementation for ``MapCanvas.mapSettings`` (a subset of MapSettings).
+    """Stub implementation for ``MapCanvas.mapSettings`` (a subset of MapSettings).
 
     https://github.com/opengisch/QField/blob/master/src/core/mapsettings.h
     """
@@ -687,9 +676,9 @@ class QFieldMapSettingsStub(QObject):
 
 
 class QFieldMapCanvasStub(QObject):
-    """
-    Stub implementation for the QML ``MapCanvas`` item returned by
-    ``iface.mapCanvas()``.
+    """Stub implementation for the QML ``MapCanvas`` item.
+
+    It is returned by ``iface.mapCanvas()``.
 
     https://github.com/opengisch/QField/blob/master/src/qml/MapCanvas.qml
     """
@@ -739,8 +728,7 @@ class QFieldFeatureUtilsStub(QObject):
 
 
 class QFieldThemeStub(QObject):
-    """
-    Stub implementation of Theme.
+    """Stub implementation of Theme.
 
     Provides color, font, and layout properties used throughout
     QField's QML components. In newer QField versions (>v4.0.6),

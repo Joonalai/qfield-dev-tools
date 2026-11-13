@@ -67,5 +67,5 @@ def test_vector_layer_with_non_default_crs_should_be_visible_in_app(
 def test_qfield_bot_should_open_project_file_and_layers_should_be_visible(
     qfield_bot: "QFieldBot",
 ):
-    # TODO: cannot use qgis_show_map since it tries to reproject the web map
+    # qgis_show_map can't be used since it tries to reproject the web map
     qfield_bot.qtbot.wait(DEFAULT_TIMEOUT * 1000)
