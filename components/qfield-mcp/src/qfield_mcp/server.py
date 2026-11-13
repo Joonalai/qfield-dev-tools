@@ -46,6 +46,11 @@ if TYPE_CHECKING:
 LOGGER = logging.getLogger(__name__)
 DEFAULT_VERSION = "4.2.9"
 MAX_ITEMS = 300
+PORT_OFFSET_ENV = "QFIELDCLOUD_PORT_OFFSET"
+NO_STACK = (
+    "This server knows no local QFieldCloud. Start one with cloud_up, or use one"
+    " that runs with cloud_attach, which is also needed after a server restart."
+)
 
 INSTRUCTIONS = """\
 Drives stock QField apps on private displays with isolated profiles.
@@ -625,14 +630,89 @@ def change_geometry(
 
 
 @tool
-def cloud_up(*, ref: str | None = None) -> str:
+def cloud_up(
+    *,
+    ref: str | None = None,
+    port_offset: int | None = None,
+    name: str | None = None,
+) -> str:
     """Start a local QFieldCloud of a release and return its URL.
 
-    The first start of a release builds images, which takes many minutes.
+    The first start of a release builds images, which takes many minutes. To use
+    a stack that already runs, see cloud_attach.
 
     :param ref: `hosted` (what app.qfield.cloud runs), `latest` or a tag. Without
         it the server's `$QFIELDCLOUD_SOURCE_DIR` checkout runs if set, else hosted
+    :param port_offset: Move every port and the compose project up by this much,
+        so stacks of parallel checkouts do not collide. Without it
+        `$QFIELDCLOUD_PORT_OFFSET` or 0
+    :param name: Compose project name instead of the one derived from the release
     """
+    stack = _make_stack(ref, port_offset, name, None)
+    if stack.runs_here() and not stack.env_file.exists():
+        msg = (
+            f"Compose project {stack.project_name} runs, but this server did not"
+            " configure it, starting it again would recreate its containers with"
+            " other ports. Use cloud_attach to work with it."
+        )
+        raise ValueError(msg)
+    stack.up()
+    return _use_stack(stack)
+
+
+@tool
+def cloud_attach(
+    *,
+    ref: str | None = None,
+    port_offset: int | None = None,
+    name: str | None = None,
+    https_port: int | None = None,
+) -> str:
+    """Use a local QFieldCloud that already runs, without building or starting it.
+
+    Give what cloud_up was given, or the compose project `name` and `https_port`
+    of a stack some other run started, such as an e2e run's. Use it after the
+    server restarted too, the stack keeps running meanwhile. The admin tools and
+    cloud_login then use this stack.
+    """
+    stack = _make_stack(ref, port_offset, name, https_port)
+    if not stack.is_up():
+        msg = (
+            f"No QFieldCloud answers at {stack.url} with the certificate of release"
+            f" {stack.ref}. Check that `ref` is the release the stack runs from"
+            " and its checkout exists, and check https_port and port_offset, or"
+            " start it with cloud_up."
+        )
+        raise ValueError(msg)
+    if not (stack.runs_here() and stack.publishes_url()):
+        msg = (
+            f"Something answers at {stack.url}, but the compose project"
+            f" {stack.project_name} does not run it: its app is not running or"
+            f" its nginx does not publish port {stack.https_port}. Check `name`."
+        )
+        raise ValueError(msg)
+    return _use_stack(stack)
+
+
+@tool
+def cloud_status() -> str:
+    """Show the local QFieldCloud the cloud tools use, its URL and if it answers."""
+    if _stack is None:
+        return f"None in use. {NO_STACK}"
+    state = "up" if _stack.is_up() else "not answering"
+    user, password = _stack.admin
+    return (
+        f"{_stack.url} {state}, release {_stack.ref}, compose project"
+        f" {_stack.project_name}, admin {user} / {password}"
+    )
+
+
+def _make_stack(
+    ref: str | None,
+    port_offset: int | None,
+    name: str | None,
+    https_port: int | None,
+) -> QFieldCloudStack:
     from qfield_driver.cloud.stack import (  # noqa: PLC0415
         HOSTED,
         SOURCE_ENV,
@@ -640,18 +720,33 @@ def cloud_up(*, ref: str | None = None) -> str:
         resolve_ref,
     )
 
+    if port_offset is None:
+        port_offset = int(os.environ.get(PORT_OFFSET_ENV) or 0)
+    extra: dict[str, Any] = {}
+    if name:
+        extra["name"] = name
+    if https_port:
+        extra["https_port"] = https_port
     source = os.environ.get(SOURCE_ENV) if ref is None else None
-    stack = (
-        QFieldCloudStack.local(Path(source), default_cache_dir())
-        if source
-        else QFieldCloudStack(resolve_ref(ref or HOSTED), default_cache_dir())
+    if source:
+        stack = QFieldCloudStack.local(Path(source), default_cache_dir(), port_offset)
+        for key, value in extra.items():
+            setattr(stack, key, value)
+        return stack
+    return QFieldCloudStack.with_offset(
+        resolve_ref(ref or HOSTED), default_cache_dir(), port_offset, **extra
     )
-    stack.up()
-    global _stack  # noqa: PLW0603 the tools below talk to the stack started last
+
+
+def _use_stack(stack: QFieldCloudStack) -> str:
+    global _stack  # noqa: PLW0603 the tools below talk to the stack used last
     _stack = stack
     _clients.clear()
     user, password = stack.admin
-    return f"{stack.url} release {stack.ref}, admin {user} / {password}"
+    return (
+        f"{stack.url} release {stack.ref}, compose project {stack.project_name},"
+        f" admin {user} / {password}"
+    )
 
 
 def _project_dir(directory: str) -> Path:
@@ -671,7 +766,7 @@ def _client(username: str | None, password: str | None) -> QFieldCloudClient:
     from qfield_driver.cloud.client import QFieldCloudClient  # noqa: PLC0415
 
     if _stack is None:
-        msg = "No local QFieldCloud, start one with cloud_up"
+        msg = NO_STACK
         raise ValueError(msg)
     if username is None and password is None:
         username, password = _stack.admin
@@ -693,7 +788,7 @@ def cloud_user(username: str, password: str, *, superuser: bool = False) -> str:
     Give each device a user of its own, a login ends the user's other sessions.
     """
     if _stack is None:
-        msg = "No local QFieldCloud, start one with cloud_up"
+        msg = NO_STACK
         raise ValueError(msg)
     _stack.ensure_user(username, password, superuser=superuser)
     return f"user {username} ready"
@@ -795,9 +890,23 @@ def cloud_deltas(
 
 @tool
 def cloud_login(
-    url: str, username: str, password: str, *, device: str = "device"
+    url: str | None = None,
+    username: str | None = None,
+    password: str | None = None,
+    *,
+    device: str = "device",
 ) -> str:
-    """Log a device in to a QFieldCloud."""
+    """Log a device in to a QFieldCloud.
+
+    :param url: Without it the stack of cloud_up or cloud_attach
+    """
+    if url is None:
+        if _stack is None:
+            raise ValueError(NO_STACK)
+        url = _stack.url
+    if username is None or password is None:
+        msg = "Give username and password"
+        raise ValueError(msg)
     with devices.use(device) as app:
         actions.login(app, url, username, password)
     return "logged in"

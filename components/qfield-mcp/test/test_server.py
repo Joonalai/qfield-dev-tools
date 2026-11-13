@@ -375,10 +375,221 @@ def fake_cloud(monkeypatch: pytest.MonkeyPatch) -> FakeStack:
 def test_cloud_tools_need_a_stack(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(server, "_stack", None)
 
-    with pytest.raises(Exception, match="cloud_up"):
+    with pytest.raises(Exception, match="cloud_attach"):
         call("cloud_deltas", project_id="x")
     with pytest.raises(Exception, match="cloud_up"):
         call("cloud_user", username="a", password=PASSWORD)
+
+
+class MovableStack(FakeStack):
+    """Stands in for `QFieldCloudStack` where the tools build one."""
+
+    running = True
+    owned = True
+    configured = True
+    instances: list["MovableStack"] = []  # noqa: RUF012 shared on purpose
+
+    def __init__(self, ref: str, offset: int, **fields: Any) -> None:  # noqa: ANN401
+        self.ref = ref
+        self.offset = offset
+        self.fields = fields
+        self.project_name = fields.get("name") or f"project-{ref}-{offset}"
+        self.https_port = fields.get("https_port", 8543 + offset)
+        self.url = f"https://localhost:{self.https_port}"
+        self.upped = False
+        self.instances.append(self)
+
+    @classmethod
+    def with_offset(
+        cls,
+        ref: str,
+        _cache_dir: Path,
+        offset: int,
+        **fields: Any,  # noqa: ANN401
+    ) -> "MovableStack":
+        return cls(ref, offset, **fields)
+
+    @classmethod
+    def local(cls, source: Path, _cache_dir: Path, offset: int = 0) -> "MovableStack":
+        return cls(f"local-{source.name}", offset)
+
+    @property
+    def env_file(self) -> Path:
+        return Path(__file__ if self.configured else "/nope/missing")
+
+    def is_up(self) -> bool:
+        return self.running
+
+    def runs_here(self) -> bool:
+        return self.owned
+
+    def publishes_url(self) -> bool:
+        return self.owned
+
+    def up(self) -> None:
+        self.upped = True
+
+
+@pytest.fixture
+def movable_stack(monkeypatch: pytest.MonkeyPatch) -> type[MovableStack]:
+    MovableStack.instances = []
+    MovableStack.running = True
+    MovableStack.owned = True
+    MovableStack.configured = True
+    monkeypatch.setattr(server, "_stack", None)
+    monkeypatch.setattr("qfield_driver.cloud.stack.QFieldCloudStack", MovableStack)
+    monkeypatch.setattr("qfield_driver.cloud.stack.resolve_ref", lambda ref: ref)
+    monkeypatch.delenv("QFIELDCLOUD_PORT_OFFSET", raising=False)
+    monkeypatch.delenv("QFIELDCLOUD_SOURCE_DIR", raising=False)
+    return MovableStack
+
+
+def test_cloud_up_moves_the_stack_by_the_offset(
+    movable_stack: type[MovableStack],
+) -> None:
+    result = call("cloud_up", ref="v1", port_offset=10)
+
+    stack = movable_stack.instances[0]
+    assert (stack.upped, stack.offset) == (True, 10)
+    assert "https://localhost:8553" in result
+    assert "project-v1-10" in result
+    assert server._stack is stack
+
+
+def test_cloud_up_reads_the_offset_from_the_environment(
+    movable_stack: type[MovableStack], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("QFIELDCLOUD_PORT_OFFSET", "20")
+
+    call("cloud_up", ref="v1", name="mine")
+
+    stack = movable_stack.instances[0]
+    assert stack.offset == 20
+    assert stack.fields == {"name": "mine"}
+
+
+def test_cloud_up_runs_a_local_checkout_by_default(
+    movable_stack: type[MovableStack], monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    monkeypatch.setenv("QFIELDCLOUD_SOURCE_DIR", str(tmp_path))
+
+    call("cloud_up", port_offset=5, name="mine")
+
+    stack = movable_stack.instances[0]
+    assert stack.ref == f"local-{tmp_path.name}"
+    assert stack.offset == 5
+    assert stack.name == "mine"  # type: ignore[attr-defined]
+
+
+def test_cloud_attach_uses_a_running_stack_without_starting_it(
+    movable_stack: type[MovableStack],
+) -> None:
+    result = call("cloud_attach", ref="v1", name="vallu_e2e", https_port=8443)
+
+    stack = movable_stack.instances[0]
+    assert not stack.upped
+    assert server._stack is stack
+    assert "https://localhost:8443" in result
+    assert "vallu_e2e" in result
+    assert "https://localhost:8443 up" in call("cloud_status")
+
+
+def test_cloud_attach_names_what_it_looked_for(
+    movable_stack: type[MovableStack],
+) -> None:
+    movable_stack.running = False
+
+    with pytest.raises(Exception, match=r"No QFieldCloud answers at"):
+        call("cloud_attach", ref="v1", name="vallu_e2e")
+
+    assert server._stack is None
+
+
+def test_cloud_attach_refuses_a_project_that_does_not_own_the_url(
+    movable_stack: type[MovableStack],
+) -> None:
+    movable_stack.owned = False
+
+    with pytest.raises(Exception, match=r"vallu_e2e does not run it.*Check `name`"):
+        call("cloud_attach", ref="v1", name="vallu_e2e", https_port=8443)
+
+    assert server._stack is None
+
+
+def test_cloud_attach_error_points_at_the_ref(
+    movable_stack: type[MovableStack],
+) -> None:
+    movable_stack.running = False
+
+    with pytest.raises(Exception, match="`ref` is the release the stack runs from"):
+        call("cloud_attach", ref="v1")
+
+
+def test_cloud_up_leaves_a_stack_of_another_run_alone(
+    movable_stack: type[MovableStack],
+) -> None:
+    movable_stack.configured = False
+
+    with pytest.raises(Exception, match=r"did not configure it.*cloud_attach"):
+        call("cloud_up", ref="v1", name="vallu_e2e")
+
+    assert not movable_stack.instances[0].upped
+    assert server._stack is None
+
+
+def test_cloud_up_of_an_unfetched_release_reaches_up(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    from qfield_driver.cloud.stack import QFieldCloudStack  # noqa: PLC0415
+
+    started: list[QFieldCloudStack] = []
+
+    def record_up(stack: QFieldCloudStack) -> None:
+        started.append(stack)
+
+    monkeypatch.setattr(server, "_stack", None)
+    monkeypatch.setattr("qfield_driver.cloud.stack.resolve_ref", lambda ref: ref)
+    monkeypatch.setattr(server, "default_cache_dir", lambda: tmp_path)
+    monkeypatch.setattr(QFieldCloudStack, "up", record_up)
+    monkeypatch.delenv("QFIELDCLOUD_SOURCE_DIR", raising=False)
+
+    call("cloud_up", ref="v0.0.0-never")
+
+    assert [stack.ref for stack in started] == ["v0.0.0-never"]
+
+
+def test_cloud_status_says_when_nothing_is_in_use(
+    movable_stack: type[MovableStack],  # noqa: ARG001
+) -> None:
+    assert "cloud_attach" in call("cloud_status")
+
+
+@pytest.mark.usefixtures("fake_cloud")
+def test_cloud_login_defaults_to_the_stack_url(
+    monkeypatch: pytest.MonkeyPatch, fake_device: str
+) -> None:
+    logins: list[tuple[str, str, str]] = []
+    monkeypatch.setattr(
+        server.actions,
+        "login",
+        lambda _app, url, user, password: logins.append((url, user, password)),
+    )
+
+    call("cloud_login", username="surveyor", password=PASSWORD, device=fake_device)
+    call(
+        "cloud_login",
+        url="https://x",
+        username="u",
+        password=PASSWORD,
+        device=fake_device,
+    )
+    with pytest.raises(Exception, match="username and password"):
+        call("cloud_login", device=fake_device)
+
+    assert logins == [
+        ("https://cloud.test", "surveyor", PASSWORD),
+        ("https://x", "u", PASSWORD),
+    ]
 
 
 def test_cloud_user_is_created_on_the_stack(fake_cloud: FakeStack) -> None:
