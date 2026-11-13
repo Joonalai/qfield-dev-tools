@@ -176,6 +176,10 @@ def eval_js(code: str, *, device: str = "device") -> Any:  # noqa: ANN401
     `platformUtilities`, `messageLogModel`, `featureHistory`, `flatLayerTree`,
     `trackingModel`, `LayerUtils`, `GeometryUtils`, `FeatureUtils`,
     `StringUtils` and `Theme`. Use `return` to get a value back.
+
+    QML exposes less of the QGIS API than PyQGIS. `qgisProject.mapLayers()` and
+    `QgsFields.at()` do not exist, use
+    `qgisProject.mapLayersByName('points')[0].fields.names` instead.
     """
     with devices.use(device) as app:
         return app.eval(code)

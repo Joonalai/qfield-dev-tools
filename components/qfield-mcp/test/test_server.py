@@ -102,6 +102,14 @@ def test_items_can_be_found_and_tapped(device: str) -> None:
     assert "tapped" in call("tap", device=device, text="Local projects")
 
 
+def test_eval_js_description_names_the_qml_api_differences() -> None:
+    tools = asyncio.run(server.server.list_tools())
+    description = next(tool.description for tool in tools if tool.name == "eval_js")
+
+    assert "mapLayersByName" in description
+    assert "fields.names" in description
+
+
 @pytest.mark.qfield_app
 def test_tap_and_wait_explain_misses(device: str) -> None:
     with pytest.raises(Exception, match="No visible item with text"):
