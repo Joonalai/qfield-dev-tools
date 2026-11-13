@@ -138,6 +138,17 @@ def test_device_restarts_under_the_same_name(device: str) -> None:
     assert call("list_devices") == [device]
 
 
+def test_unusable_app_binary_is_named_in_the_error(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    monkeypatch.setenv("QFIELD_APP_BINARY", str(tmp_path / "AppRun"))
+
+    with pytest.raises(Exception, match=r"QFIELD_APP_BINARY.*`version`.*unset"):
+        call("start_device", name="broken")
+
+    assert "broken" not in server.devices.names()
+
+
 def test_orphans_of_a_dead_server_are_stopped(tmp_path: Path) -> None:
     dead = subprocess.Popen(["true"])  # noqa: S607 coreutils from PATH
     dead.wait()
