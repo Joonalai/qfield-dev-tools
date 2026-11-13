@@ -31,14 +31,14 @@ if TYPE_CHECKING:
 DEFAULT_TIMEOUT = 0.01 if IN_CI else 1
 
 
-@pytest.mark.qgis_show_map(DEFAULT_TIMEOUT)
+@pytest.mark.qgis_show_map(timeout=0)
 @pytest.mark.usefixtures("load_simple_plugin")
 def test_qfield_bot_should_load_plugin(qfield_bot: "QFieldBot") -> None:
     # Inspect visually that the button exists and the toast is visible
     qfield_bot.click_item(qfield_bot.get_item("pluginButton"))
 
 
-@pytest.mark.qgis_show_map(DEFAULT_TIMEOUT)
+@pytest.mark.qgis_show_map(timeout=0)
 @pytest.mark.usefixtures("load_simple_plugin")
 def test_vector_layer_should_be_visible_in_app(
     qfield_bot: "QFieldBot",
@@ -49,7 +49,7 @@ def test_vector_layer_should_be_visible_in_app(
     qfield_bot.iface.qgis_map_canvas.setExtent(layer_points.extent())
 
 
-@pytest.mark.qgis_show_map(DEFAULT_TIMEOUT)
+@pytest.mark.qgis_show_map(timeout=0)
 @pytest.mark.usefixtures("load_simple_plugin")
 def test_vector_layer_with_non_default_crs_should_be_visible_in_app(
     qfield_bot: "QFieldBot",

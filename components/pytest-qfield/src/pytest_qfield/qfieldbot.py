@@ -329,9 +329,9 @@ class QFieldBot:
             self._qml_engine.load(str(qml_file))
 
         new_logs = [
-            (m.type, m.message.strip())
-            for m in self.qtlog.records[initial_log_count:]
-            if m.type
+            (record.type, record.message.strip())
+            for record in self.qtlog.records[initial_log_count:]
+            if record.type
             in (QtMsgType.QtWarningMsg, QtMsgType.QtCriticalMsg, QtMsgType.QtFatalMsg)
         ]
         if raise_if_warnings and new_logs:
