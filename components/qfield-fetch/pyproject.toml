@@ -2,7 +2,7 @@
 name = "qfield-fetch"
 description = "Download QField AppImages and QField and QFieldCloud sources into one cache"
 readme = "README.md"
-version = "0.0.0"
+version = "0.1.0"
 keywords = ["QField", "QFieldCloud", "GIS", "AppImage"]
 license = "GPL-2.0-or-later"
 license-files = ["LICENSE"]

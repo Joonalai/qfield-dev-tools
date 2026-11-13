@@ -1,5 +1,5 @@
 version = 1
-revision = 3
+revision = 5
 requires-python = ">=3.12"
 resolution-markers = [
     "python_full_version >= '3.15'",
@@ -11,6 +11,7 @@ members = [
     "pytest-qfield",
     "qfield-fetch",
 ]
+default-groups = ["dev", "lint"]
 
 [manifest.dependency-groups]
 dev = [
@@ -668,7 +669,7 @@ wheels = [
 
 [[package]]
 name = "qfield-fetch"
-version = "0.0.0"
+version = "0.1.0"
 source = { editable = "components/qfield-fetch" }
 dependencies = [
     { name = "typer" },
