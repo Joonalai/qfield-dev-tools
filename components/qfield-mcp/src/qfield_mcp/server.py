@@ -40,6 +40,9 @@ from qfield_mcp.devices import Devices, clean_orphans
 if TYPE_CHECKING:
     from collections.abc import Callable
 
+    from qfield_driver.cloud.client import QFieldCloudClient
+    from qfield_driver.cloud.stack import QFieldCloudStack
+
 LOGGER = logging.getLogger(__name__)
 DEFAULT_VERSION = "4.2.9"
 MAX_ITEMS = 300
@@ -54,6 +57,9 @@ CRS. Never ask for screenshots of camera views.
 """
 
 server = MCPServer("qfield", instructions=INSTRUCTIONS)
+# The local QFieldCloud that cloud_up started last, and logged in clients of it.
+_stack: QFieldCloudStack | None = None
+_clients: dict[tuple[str, str, str | None], QFieldCloudClient] = {}
 devices = Devices()
 atexit.register(devices.stop_all)
 
@@ -641,8 +647,150 @@ def cloud_up(*, ref: str | None = None) -> str:
         else QFieldCloudStack(resolve_ref(ref or HOSTED), default_cache_dir())
     )
     stack.up()
+    global _stack  # noqa: PLW0603 the tools below talk to the stack started last
+    _stack = stack
+    _clients.clear()
     user, password = stack.admin
     return f"{stack.url} release {stack.ref}, admin {user} / {password}"
+
+
+def _project_dir(directory: str) -> Path:
+    path = Path(directory).expanduser().resolve()
+    if not path.is_dir():
+        msg = f"Not a project directory: {path}"
+        raise FileNotFoundError(msg)
+    return path
+
+
+def _client(username: str | None, password: str | None) -> QFieldCloudClient:
+    """Return a client of the local cloud, logged in as the admin by default.
+
+    A login ends the same user's other sessions, so a device needs a user of
+    its own, see cloud_user.
+    """
+    from qfield_driver.cloud.client import QFieldCloudClient  # noqa: PLC0415
+
+    if _stack is None:
+        msg = "No local QFieldCloud, start one with cloud_up"
+        raise ValueError(msg)
+    if username is None and password is None:
+        username, password = _stack.admin
+    elif username is None or password is None:
+        msg = "Give username and password together"
+        raise ValueError(msg)
+    key = (_stack.url, username, password)
+    if key not in _clients:
+        _clients[key] = QFieldCloudClient(
+            _stack.url, username, password, verify=_stack.ca_certificate
+        )
+    return _clients[key]
+
+
+@tool
+def cloud_user(username: str, password: str, *, superuser: bool = False) -> str:
+    """Create a user on the local QFieldCloud, or leave an existing one alone.
+
+    Give each device a user of its own, a login ends the user's other sessions.
+    """
+    if _stack is None:
+        msg = "No local QFieldCloud, start one with cloud_up"
+        raise ValueError(msg)
+    _stack.ensure_user(username, password, superuser=superuser)
+    return f"user {username} ready"
+
+
+@tool
+def cloud_create_project(
+    name: str,
+    *,
+    directory: str | None = None,
+    collaborators: list[str] | None = None,
+    username: str | None = None,
+    password: str | None = None,
+) -> str:
+    """Create a project on the local QFieldCloud and return its id.
+
+    With `directory` the project's files go up and the project is packaged,
+    which is what a device needs to download it.
+
+    :param directory: A QField project directory to upload
+    :param collaborators: Usernames added as editors, they must exist
+    :param username: Owner of the project, the admin by default
+    """
+    client = _client(username, password)
+    path = _project_dir(directory) if directory else None
+    project_id = client.create_project(name)
+    for collaborator in collaborators or []:
+        client.add_collaborator(project_id, collaborator)
+    if path:
+        client.upload(project_id, path)
+        client.package(project_id)
+    return project_id
+
+
+@tool
+def cloud_add_collaborator(
+    project_id: str,
+    collaborator: str,
+    *,
+    role: str = "editor",
+    username: str | None = None,
+    password: str | None = None,
+) -> str:
+    """Give a user a role on a project of the local QFieldCloud.
+
+    :param role: `reader`, `reporter`, `editor`, `manager` or `admin`
+    :param username: A user who may manage the project, the admin by default
+    """
+    _client(username, password).add_collaborator(project_id, collaborator, role)
+    return f"{collaborator} is {role}"
+
+
+@tool
+def cloud_upload(
+    project_id: str,
+    directory: str,
+    *,
+    package: bool = True,
+    username: str | None = None,
+    password: str | None = None,
+) -> str:
+    """Upload a project directory to the local QFieldCloud, and package it.
+
+    :param package: Run the package job devices download from
+    """
+    client = _client(username, password)
+    path = _project_dir(directory)
+    count = client.upload(project_id, path)
+    if package:
+        client.package(project_id)
+    return f"uploaded {count} files" + (", packaged" if package else "")
+
+
+@tool
+def cloud_package(
+    project_id: str, *, username: str | None = None, password: str | None = None
+) -> str:
+    """Run the package job of a project and wait for it to finish."""
+    _client(username, password).package(project_id)
+    return "packaged"
+
+
+@tool
+def cloud_deltas(
+    project_id: str, *, username: str | None = None, password: str | None = None
+) -> list[dict[str, Any]]:
+    """Deltas a project received, with their status, such as `STATUS_APPLIED`."""
+    return [
+        {
+            **{
+                key: delta.get(key)
+                for key in ("id", "status", "created_by", "created_at")
+            },
+            "message": (delta.get("last_feedback") or {}).get("msg"),
+        }
+        for delta in _client(username, password).deltas(project_id)
+    ]
 
 
 @tool
@@ -679,8 +827,13 @@ def cloud_download(
 def cloud_synchronize(project_id: str, *, device: str = "device") -> str:
     """Push local edits and download the latest state, as Synchronize does."""
     with devices.use(device) as app:
-        actions.synchronize(app, project_id)
-    return "synchronized"
+        result = actions.synchronize(app, project_id)
+    if not result["deltas"]:
+        return "synchronized, no local changes to push"
+    return (
+        f"synchronized, deltas pushed: {result['deltas']},"
+        f" status {result['delta_status']}"
+    )
 
 
 def main() -> None:
