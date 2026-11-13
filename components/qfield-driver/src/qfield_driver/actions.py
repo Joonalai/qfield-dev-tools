@@ -34,6 +34,16 @@ if TYPE_CHECKING:
 
 LOGGED_IN = 2
 PROJECT_IDLE = 0
+# QFieldCloudProject::DeltaFileStatus
+DELTA_FILE_STATUSES = (
+    "error",
+    "local",
+    "pending",
+    "busy",
+    "conflict",
+    "not applied",
+    "applied",
+)
 RENDER_S = 1.5
 SETTLE_S = 1
 # QField asks during the load, a granted plugin never asks.
@@ -223,9 +233,15 @@ def push(app: QFieldApp, project_id: str) -> int:
     return count
 
 
-def synchronize(app: QFieldApp, project_id: str) -> None:
-    """Push local edits and download the latest cloud state, as Synchronize does."""
+def synchronize(app: QFieldApp, project_id: str) -> dict[str, Any]:
+    """Push local edits and download the latest cloud state, as Synchronize does.
+
+    Return how many deltas went up as `deltas`, and the status QField shows
+    for them as `delta_status`, for example `applied`. It is None when nothing
+    went up, QField then still shows the status of an earlier push.
+    """
     project = f"find('cloudProjectsModel').findProject({js(project_id)})"
+    count = int(app.eval("return layerObserver.deltaFileWrapper.count") or 0)
     app.eval(f"find('cloudProjectsModel').projectPush({js(project_id)}, true);")
     app.wait(
         "return layerObserver.deltaFileWrapper.count === 0"
@@ -233,6 +249,13 @@ def synchronize(app: QFieldApp, project_id: str) -> None:
         300,
         1,
     )
+    status = app.eval(f"return {project}.deltaFilePushStatus")
+    known = count > 0 and isinstance(status, int)
+    known = known and 0 <= status < len(DELTA_FILE_STATUSES)
+    return {
+        "deltas": count,
+        "delta_status": DELTA_FILE_STATUSES[status] if known else None,
+    }
 
 
 # Projects
