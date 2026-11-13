@@ -26,6 +26,7 @@ project, images and volumes, and `down_stale` removes the older ones.
 from __future__ import annotations
 
 import fcntl
+import hashlib
 import json
 import logging
 import os
@@ -143,6 +144,34 @@ def local_ref(source: Path) -> str:
 
 def compose_project_name(ref: str) -> str:
     return PROJECT_PREFIX + re.sub(r"[^a-z0-9]+", "_", ref.lower()).strip("_")
+
+
+def _docker_tag(text: str) -> str:
+    return re.sub(r"[^A-Za-z0-9_.-]", "_", text).lstrip(".-")[:128] or "unknown"
+
+
+def _git(source: Path, *args: str) -> str:
+    return subprocess.run(
+        ["git", "-C", str(source), *args], check=True, capture_output=True, text=True
+    ).stdout.strip()
+
+
+def source_version(source: Path, fallback: str) -> str:
+    """Image tag naming the state of a checkout.
+
+    `v26.30` for a release, `v26.30-3-gebfdcab` for commits after it. Edits that
+    are not committed add a hash of the diff, so each edit builds anew.
+    """
+    if not (source / ".git").exists():
+        return _docker_tag(fallback)
+    try:
+        version = _git(source, "describe", "--tags", "--always", "--dirty")
+        if version.endswith("-dirty"):
+            diff = _git(source, "diff", "HEAD")
+            version += "-" + hashlib.sha256(diff.encode()).hexdigest()[:8]
+    except (OSError, subprocess.CalledProcessError):
+        return _docker_tag(fallback)
+    return _docker_tag(version)
 
 
 @dataclass
@@ -336,16 +365,40 @@ class QFieldCloudStack:
         services = json.loads(completed.stdout)["services"]
         return sorted(name for name, spec in services.items() if "build" in spec)
 
-    def _images_missing(self, services: list[str]) -> list[str]:
+    @staticmethod
+    def _docker(*args: str) -> subprocess.CompletedProcess[str]:
+        return subprocess.run(
+            ["docker", *args], check=False, capture_output=True, text=True
+        )
+
+    def _images_missing(self, services: list[str], version: str) -> list[str]:
+        """Services without an image of this version.
+
+        Compose builds `<project>-<service>:latest`, the name the worker starts
+        siblings from, so both tags must exist.
+        """
         return [
             service
             for service in services
-            if subprocess.run(
-                ["docker", "image", "inspect", f"{self.project_name}-{service}"],
-                check=False,
-                capture_output=True,
-            ).returncode
+            if any(
+                self._docker("image", "inspect", image).returncode
+                for image in (
+                    f"{self.project_name}-{service}",
+                    f"{self.project_name}-{service}:{version}",
+                )
+            )
         ]
+
+    def _tag_images(self, services: list[str], version: str) -> None:
+        """Tag the built images with the version and drop older versions."""
+        for service in services:
+            repository = f"{self.project_name}-{service}"
+            self._docker("image", "tag", repository, f"{repository}:{version}")
+            tags = self._docker(
+                "image", "ls", "--format", "{{.Tag}}", repository
+            ).stdout.split()
+            for tag in set(tags) - {"latest", version}:
+                self._docker("image", "rm", f"{repository}:{tag}")
 
     def _wait(
         self, what: str, ready: Callable[[], bool], timeout: float = READY_TIMEOUT_S
@@ -369,14 +422,17 @@ class QFieldCloudStack:
             self._up()
 
     def _up(self) -> None:
-        self.prepare_source()
+        source = self.prepare_source()
+        version = source_version(source, self.ref)
+        built = self.built_services()
         # Worker images run as siblings, a stack can answer while one is missing.
-        missing = self._images_missing(self.built_services())
+        missing = self._images_missing(built, version)
         if missing:
             LOGGER.info(
-                "Building QFieldCloud %s %s, this takes a while", self.ref, missing
+                "Building QFieldCloud %s %s, this takes a while", version, missing
             )
             self.compose("--profile", "*", "build", *missing)
+            self._tag_images(built, version)
         elif self.is_up() and not self.reconfigured:
             if not self._runs_here():
                 msg = (
@@ -385,7 +441,7 @@ class QFieldCloudStack:
                     " ports"
                 )
                 raise StackError(msg)
-            LOGGER.info("QFieldCloud %s already running", self.ref)
+            LOGGER.info("QFieldCloud %s already running", version)
             return
         self.compose("up", "-d", "--no-build", "db", "memcached", "mkcert")
         self._wait(

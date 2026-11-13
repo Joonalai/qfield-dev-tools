@@ -175,6 +175,9 @@ applied to the upstream compose files:
   The upstream default, docker's bridge `172.17.0.1`, does not exist under podman.
 - Images to build are read from the release's compose files, so a new worker image
   (`qgis4` in v26.30) is built without a code change.
+- Images are tagged with the checkout's version from `git describe`, `v26.30` or
+  `v26.30-3-gebfdcab`, and built again when it changes. Uncommitted edits in a
+  checkout of your own add a hash of the diff. Older version tags are removed.
 
 When a package job fails with exit code 0, read the job `feedback` through
 `client.jobs(project_id)`, the worker log alone is misleading.
