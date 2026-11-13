@@ -26,6 +26,7 @@ jobs:
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           vcs_release: false
+          directory: components/pytest-qfield
 
       # Publsh to PyPI only if the release was made
       - name: Install uv
