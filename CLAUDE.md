@@ -1,6 +1,6 @@
 # CLAUDE.md
 
-Guidance for AI coding agents working in `qfield-dev-tools`. Each component's README covers its user-facing API; this file and the component-level `CLAUDE.md` files focus on gotchas and conventions that aren't obvious from reading the code.
+Guidance for AI coding agents working in `qfield-dev-tools`. Each component's README covers its user-facing API; this file and the component-level `CLAUDE.md` files focus on gotchas and conventions that aren't obvious from reading the code. Setup, test commands and the release flow for humans are in `DEVELOPMENT.md`.
 
 ## Agent skills
 
