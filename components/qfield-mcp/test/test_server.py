@@ -219,6 +219,29 @@ def test_set_field_and_save_form_use_the_form_of_a_new_feature(
     )
 
 
+def test_cloud_download_passes_the_plugin_grant_on(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    opened: list[bool] = []
+    monkeypatch.setattr(
+        server.actions, "download_project", lambda _app, _id: Path("/p.qgs")
+    )
+    monkeypatch.setattr(
+        server.actions,
+        "open_project",
+        lambda _app, _path, *, grant_plugin=False: opened.append(grant_plugin),
+    )
+    lock = server.devices.reserve("fake")
+    server.devices.add("fake", type("App", (), {"process_groups": {}})())
+    lock.release()
+    try:
+        call("cloud_download", project_id="x", device="fake", grant_project_plugin=True)
+    finally:
+        server.devices.forget("fake")
+
+    assert opened == [True]
+
+
 def test_unusable_app_binary_is_named_in_the_error(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
