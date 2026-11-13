@@ -72,6 +72,7 @@ DISABLED_SERVICES = ("ofelia",)
 RESOLVER_SCRIPT = "nginx-fix-resolver.sh"
 PROJECT_PREFIX = "pytest_qfieldcloud_"
 READY_TIMEOUT_S = 300
+CONTAINER_MARKERS = ("/.dockerenv", "/run/.containerenv")
 ADMIN = ("admin", "admin123")
 # Default host ports, by `QFieldCloudStack` field.
 PORTS = {
@@ -108,11 +109,23 @@ def resolve_ref(ref: str) -> str:
     return ref
 
 
+def _in_container() -> bool:
+    return any(Path(marker).exists() for marker in CONTAINER_MARKERS)
+
+
 def container_socket() -> str:
     """Host path of the socket the worker uses for sibling containers."""
     host = os.environ.get("DOCKER_HOST", "")
     if host.startswith("unix://"):
         return host.removeprefix("unix://")
+    if not host and _in_container():
+        # The engine resolves the worker's bind mount on the host, not here.
+        LOGGER.warning(
+            "Running in a container without DOCKER_HOST, the socket path guessed"
+            " here may not exist on the host and package jobs would stay pending."
+            " Mount the socket, the repository and the qfield-fetch cache at their"
+            " host paths and set DOCKER_HOST=unix://<host socket path>."
+        )
     podman = Path(os.environ.get("XDG_RUNTIME_DIR", "/nonexistent"))
     podman /= "podman/podman.sock"
     return str(podman) if podman.exists() else "/var/run/docker.sock"
@@ -490,6 +503,25 @@ class QFieldCloudStack:
         with (self.cache_dir / f".{self.project_name}.lock").open("w") as lock:
             fcntl.flock(lock, fcntl.LOCK_EX)
             self._up()
+            self._check_worker_engine()
+
+    def _check_worker_engine(self) -> None:
+        """Fail when the worker cannot reach the engine, instead of jobs hanging."""
+        if "worker_wrapper" not in self.compose("config", "--services").stdout.split():
+            return
+        ping = "import docker; docker.from_env().ping()"
+        completed = self.compose(
+            "exec", "-T", "worker_wrapper", "python", "-c", ping, check=False
+        )
+        if completed.returncode:
+            msg = (
+                "The QFieldCloud worker cannot reach the container engine through"
+                f" {self.socket}, so package jobs would stay pending. That path"
+                " must exist on the host, mount the socket, the repository and the"
+                " qfield-fetch cache at their host paths and set"
+                f" DOCKER_HOST=unix://<host socket path>.\n{completed.stderr[-1000:]}"
+            )
+            raise StackError(msg)
 
     def _up(self) -> None:
         source = self.prepare_source()
