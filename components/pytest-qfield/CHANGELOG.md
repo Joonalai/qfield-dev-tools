@@ -1,23 +1,36 @@
 # CHANGELOG
 
 
+## v0.11.1 (2026-11-13)
+
+### Bug Fixes
+
+- Return false from deleteFeature stub when commit fails
+  ([`b08fa68`](https://github.com/Joonalai/qfield-dev-tools/commit/b08fa689f53e258665eab8d0eb16e50c84c46d34))
+
+### Documentation
+
+- Remove old instruction on PyQt6
+  ([`81c5a87`](https://github.com/Joonalai/qfield-dev-tools/commit/81c5a87c1254f663a97cdfcdb736867979a5f159))
+
+
 ## v0.11.0 (2026-10-13)
 
 ### Bug Fixes
 
 - Drop PyQt6 dependency to use the one shipped with QGIS
-  ([`577b6c5`](https://github.com/Joonalai/pytest-qfield/commit/577b6c5d3e39343e0d9af9b0c9e74c6c80f8d897))
+  ([`577b6c5`](https://github.com/Joonalai/qfield-dev-tools/commit/577b6c5d3e39343e0d9af9b0c9e74c6c80f8d897))
 
 - Remove qml `Theme` dir existence check
-  ([`6c3a96f`](https://github.com/Joonalai/pytest-qfield/commit/6c3a96fda7a1a448722623464fea5950493b8c72))
+  ([`6c3a96f`](https://github.com/Joonalai/qfield-dev-tools/commit/6c3a96fda7a1a448722623464fea5950493b8c72))
 
 ### Features
 
 - Rename QFIELD_IMPORTS_DIR to QFIELD_SOURCE_DIR
-  ([`305735f`](https://github.com/Joonalai/pytest-qfield/commit/305735fde33c3f7916bfd00532f08fb6b35708fe))
+  ([`305735f`](https://github.com/Joonalai/qfield-dev-tools/commit/305735fde33c3f7916bfd00532f08fb6b35708fe))
 
 - Support also QField 4.3+ qml layout
-  ([`4a19f03`](https://github.com/Joonalai/pytest-qfield/commit/4a19f0365ae94514e227fca23720b8a9a236de0f))
+  ([`4a19f03`](https://github.com/Joonalai/qfield-dev-tools/commit/4a19f0365ae94514e227fca23720b8a9a236de0f))
 
 
 ## v0.10.0 (2026-10-02)
@@ -25,10 +38,10 @@
 ### Features
 
 - Add valueBool to QSettingsStub and isolate settings per test
-  ([`0ae38b9`](https://github.com/Joonalai/pytest-qfield/commit/0ae38b9fe00a9dbba04c1e813c08d6d342b2cf59))
+  ([`0ae38b9`](https://github.com/Joonalai/qfield-dev-tools/commit/0ae38b9fe00a9dbba04c1e813c08d6d342b2cf59))
 
 - Overlay QML window on the canvas so full-map items are clickable
-  ([`2609aa4`](https://github.com/Joonalai/pytest-qfield/commit/2609aa4f85a9975bd6ad53f4dcc6c66b02da2117))
+  ([`2609aa4`](https://github.com/Joonalai/qfield-dev-tools/commit/2609aa4f85a9975bd6ad53f4dcc6c66b02da2117))
 
 
 ## v0.9.0 (2026-06-12)
@@ -36,7 +49,7 @@
 ### Features
 
 - Add readProject*Entry slots to AppInterface stub
-  ([`6f92e7d`](https://github.com/Joonalai/pytest-qfield/commit/6f92e7d26c02a4db350c92226f66f0a97dcd7769))
+  ([`6f92e7d`](https://github.com/Joonalai/qfield-dev-tools/commit/6f92e7d26c02a4db350c92226f66f0a97dcd7769))
 
 
 ## v0.8.0 (2026-06-05)
@@ -44,7 +57,7 @@
 ### Features
 
 - Honor open edit session in LayerUtils.deleteFeature stub
-  ([`7693025`](https://github.com/Joonalai/pytest-qfield/commit/7693025f2b0f922ed438436624d762f43eb3d5f1))
+  ([`7693025`](https://github.com/Joonalai/qfield-dev-tools/commit/7693025f2b0f922ed438436624d762f43eb3d5f1))
 
 
 ## v0.7.0 (2026-06-05)
@@ -52,16 +65,16 @@
 ### Features
 
 - Add feature-form lifecycle stubs and QFieldBot helpers
-  ([`ae2bbea`](https://github.com/Joonalai/pytest-qfield/commit/ae2bbeab8fc5fb4510ca576ef166cc4ce1f38e05))
+  ([`ae2bbea`](https://github.com/Joonalai/qfield-dev-tools/commit/ae2bbeab8fc5fb4510ca576ef166cc4ce1f38e05))
 
 - Add LayerUtils.deleteFeature stub slot
-  ([`b951706`](https://github.com/Joonalai/pytest-qfield/commit/b951706a6ac484d50aa891a95e6b960c32945280))
+  ([`b951706`](https://github.com/Joonalai/qfield-dev-tools/commit/b951706a6ac484d50aa891a95e6b960c32945280))
 
 - Add settings and focused-occurrence stub surface
-  ([`b2c89b2`](https://github.com/Joonalai/pytest-qfield/commit/b2c89b2c83639d57de67fc6d9d1f8854b8d0d7a1))
+  ([`b2c89b2`](https://github.com/Joonalai/qfield-dev-tools/commit/b2c89b2c83639d57de67fc6d9d1f8854b8d0d7a1))
 
 - Forward edit signals on QgsVectorLayerStub
-  ([`a57a28c`](https://github.com/Joonalai/pytest-qfield/commit/a57a28c263cb9ef5aea7c55b0596372cf1f327c4))
+  ([`a57a28c`](https://github.com/Joonalai/qfield-dev-tools/commit/a57a28c263cb9ef5aea7c55b0596372cf1f327c4))
 
 
 ## v0.6.1 (2026-05-26)
@@ -69,7 +82,7 @@
 ### Bug Fixes
 
 - Pin C++ ownership and retain Python refs for stubs returned to QML
-  ([`92d645b`](https://github.com/Joonalai/pytest-qfield/commit/92d645baa25a9b3d59d65e0402ac0886c2d0feb2))
+  ([`92d645b`](https://github.com/Joonalai/qfield-dev-tools/commit/92d645baa25a9b3d59d65e0402ac0886c2d0feb2))
 
 
 ## v0.6.0 (2026-05-22)
@@ -77,15 +90,15 @@
 ### Bug Fixes
 
 - Pin C++ ownership in register_named_item so QML lookups don't reassign
-  ([`963c8af`](https://github.com/Joonalai/pytest-qfield/commit/963c8afee97975b0e3299c3907f7444efeec3cd9))
+  ([`963c8af`](https://github.com/Joonalai/qfield-dev-tools/commit/963c8afee97975b0e3299c3907f7444efeec3cd9))
 
 ### Features
 
 - Add click_map_at and long_press_map_at QFieldBot helpers
-  ([`8bab5bc`](https://github.com/Joonalai/pytest-qfield/commit/8bab5bc8a96a41355ea638a66af04b053b35239e))
+  ([`8bab5bc`](https://github.com/Joonalai/qfield-dev-tools/commit/8bab5bc8a96a41355ea638a66af04b053b35239e))
 
 - Add featureForm named-item stub
-  ([`b55b90e`](https://github.com/Joonalai/pytest-qfield/commit/b55b90e96379936a4ac62ef0057295780abf8a7a))
+  ([`b55b90e`](https://github.com/Joonalai/qfield-dev-tools/commit/b55b90e96379936a4ac62ef0057295780abf8a7a))
 
 
 ## v0.5.0 (2026-05-22)
@@ -93,10 +106,10 @@
 ### Features
 
 - Add findItemByObjectName with auto-registered Positioning and GeometryHighlighter stubs
-  ([`11e33fe`](https://github.com/Joonalai/pytest-qfield/commit/11e33fef3da0442adb3a28af543177ff7fc5e05d))
+  ([`11e33fe`](https://github.com/Joonalai/qfield-dev-tools/commit/11e33fef3da0442adb3a28af543177ff7fc5e05d))
 
 - Add QFieldMapCanvasStub with clicked signals and QGIS-backed screenToCoordinate
-  ([`1e3ddd1`](https://github.com/Joonalai/pytest-qfield/commit/1e3ddd12f590523f5792cf38af1828d19c794087))
+  ([`1e3ddd1`](https://github.com/Joonalai/qfield-dev-tools/commit/1e3ddd12f590523f5792cf38af1828d19c794087))
 
 
 ## v0.4.0 (2026-04-06)
@@ -104,7 +117,7 @@
 ### Features
 
 - Add stub for QFieldThemeStub enabling newer QField versions
-  ([`81b6973`](https://github.com/Joonalai/pytest-qfield/commit/81b69738adb4d8afb9a8b1fa7f572cb1016dec64))
+  ([`81b6973`](https://github.com/Joonalai/qfield-dev-tools/commit/81b69738adb4d8afb9a8b1fa7f572cb1016dec64))
 
 
 ## v0.3.0 (2026-03-27)
@@ -112,12 +125,12 @@
 ### Bug Fixes
 
 - Fix feature iterator logic
-  ([`7864486`](https://github.com/Joonalai/pytest-qfield/commit/7864486efea10ab49ec9611624ab75b910d1162d))
+  ([`7864486`](https://github.com/Joonalai/qfield-dev-tools/commit/7864486efea10ab49ec9611624ab75b910d1162d))
 
 ### Features
 
 - Add stub for QgsVectorLayer.getFeature
-  ([`0a6d0d2`](https://github.com/Joonalai/pytest-qfield/commit/0a6d0d2f696c8f48445ba61e9f958356eaedf8a9))
+  ([`0a6d0d2`](https://github.com/Joonalai/qfield-dev-tools/commit/0a6d0d2f696c8f48445ba61e9f958356eaedf8a9))
 
 
 ## v0.2.4 (2026-03-27)
@@ -125,7 +138,7 @@
 ### Bug Fixes
 
 - Use session fixture to register qml types to avoid Qt limit of 60 registered types
-  ([`da17f22`](https://github.com/Joonalai/pytest-qfield/commit/da17f226e4e2c1318bf4be39bd6d3db48decaa31))
+  ([`da17f22`](https://github.com/Joonalai/qfield-dev-tools/commit/da17f226e4e2c1318bf4be39bd6d3db48decaa31))
 
 
 ## v0.2.3 (2026-03-27)
@@ -133,7 +146,7 @@
 ### Bug Fixes
 
 - Pass correct default value to QgsVectorLayerUtils.createFeature
-  ([`d8a4568`](https://github.com/Joonalai/pytest-qfield/commit/d8a456807ba336c301fb62bd6cc22914a549d188))
+  ([`d8a4568`](https://github.com/Joonalai/qfield-dev-tools/commit/d8a456807ba336c301fb62bd6cc22914a549d188))
 
 
 ## v0.2.2 (2026-03-26)
@@ -141,7 +154,7 @@
 ### Bug Fixes
 
 - Fix changelog creation
-  ([`3015964`](https://github.com/Joonalai/pytest-qfield/commit/30159644bdb5d2bbd28ae735a495cf4f3f838824))
+  ([`3015964`](https://github.com/Joonalai/qfield-dev-tools/commit/30159644bdb5d2bbd28ae735a495cf4f3f838824))
 
 
 ## v0.2.1 (2026-03-26)
@@ -149,10 +162,10 @@
 ### Features
 
 - Add functionality to open a QField project
-  ([`3db9d64`](https://github.com/Joonalai/pytest-qfield/commit/3db9d64dd6d92c3b289a029c2858726f4198989f))
+  ([`3db9d64`](https://github.com/Joonalai/qfield-dev-tools/commit/3db9d64dd6d92c3b289a029c2858726f4198989f))
 
 - Use alternative way to sync map layers to show web maps as well
-  ([`8b96ae6`](https://github.com/Joonalai/pytest-qfield/commit/8b96ae643c051f1c4a1b1ea65e73294d853dc5d5))
+  ([`8b96ae6`](https://github.com/Joonalai/qfield-dev-tools/commit/8b96ae643c051f1c4a1b1ea65e73294d853dc5d5))
 
 
 ## v0.1.0 (2026-03-24)
