@@ -1,0 +1,12 @@
+# _commit: b7af219
+_src_path: https://github.com/nlsfi/agent-instructions-template.git
+external_skills:
+- pyqgis-dev
+has_airflow: false
+has_ansible: false
+has_java: false
+has_jenkins: false
+has_python: true
+has_qgis: true
+has_sql: false
+use_external_skills: true
