@@ -123,10 +123,10 @@ app.lose_position()
 ## QFieldCloud
 
 With the `cloud` extra. QFieldCloud releases often and only the newest release is
-maintained. `QFieldCloudStack` runs the official compose stack of one release,
-`resolve_ref("hosted")` follows app.qfield.cloud, so a run matches what field
-devices sync against. Each release gets its own compose project, images and volumes.
-The checkout lives in the qfield-fetch cache.
+maintained. `QFieldCloudStack` runs the official compose stack of one release, and
+`resolve_ref("hosted")` follows app.qfield.cloud, so a run matches what field devices
+sync against. Each release gets its own compose project, images and volumes, and its
+checkout lives in the qfield-fetch cache.
 
 ```python
 from qfield_fetch import default_cache_dir
@@ -141,43 +141,68 @@ admin.upload(project_id, Path("project"))
 admin.package(project_id)
 ```
 
-`QFieldCloudStack.local(checkout, cache_dir)` runs a QFieldCloud checkout of your
-own instead. The stack writes its `.env.<project>` and compose overrides into that checkout.
-`QFieldCloudStack.with_offset(ref, cache_dir, n)` moves every port up by `n` from the
-defaults and suffixes the default compose project with `-n`; `local` takes an `offset`
-argument too. Explicit ports and `name` win, offset 0 is the plain stack. Runs that
-share one stack share its one admin token, and one run's login invalidates the other's
-(`Token has expired`), so parallel worktrees need distinct offsets. Stacks of one ref
-share the checkout but not its configuration: each project has its own env file and
-services override, and every compose call names them. Offsets that are multiples of 10
-up to 50 never collide, others can: the stack uses host ports 8109, 8113, 8180 (with
-8182 to 8184 for the mail test server), 8432 and 8543 at offset 0, so offsets 1 to 4,
-67 to 75 or 111 apart, for example, share one. Each offset also builds its own
-`<project>-<service>` images, so its first start is a long build and takes extra GB.
-`qfdc up` and `qfdc down` take `--port-offset` (env `QFIELDCLOUD_PORT_OFFSET`), and
-`qfdc prune` removes the offset stacks of a stale ref too.
-`stack.ensure_user(name, password)` creates a user, and the client covers projects,
-collaborators, files, jobs and deltas, with `wait_for_jobs` and `wait_for_deltas`.
+- `stack.ensure_user(name, password)` creates a user. The client covers projects,
+  collaborators, files, jobs and deltas, with `wait_for_jobs` and `wait_for_deltas`.
+- `QFieldCloudStack.local(checkout, cache_dir)` runs a QFieldCloud checkout of your own.
+  It writes its `.env.<project>` and compose overrides into that checkout.
+- The stack runs on `https://localhost:8543`. Clients verify TLS against the stack's
+  own mkcert authority, `stack.ca_certificate`. QField accepts it, since it ignores TLS
+  errors on hosts outside `.qfield.cloud`.
+- Ports are bound to localhost. Only the object storage API also listens on the host's
+  LAN address, where the containers reach it.
+- The admin is `admin`/`admin123`, so keep it a disposable test stack.
+- When a package job fails with exit code 0, read the job `feedback` through
+  `client.jobs(project_id)`. The worker log alone is misleading.
 
-The stack binds its ports to localhost, only the object storage API also listens on
-the host's LAN address, where the containers reach it. The admin is
-`admin`/`admin123`, so keep it a disposable test stack. Clients verify TLS against
-the stack's own mkcert authority, `stack.ca_certificate`. HTTPS is on port 8543.
+### Command line
 
 ```bash
-qfield-driver-cloud ref               # what `hosted` resolves to
-qfield-driver-cloud ref --check v26.30  # exit 1 when a pinned tag is not hosted
-qfield-driver-cloud up --ref latest   # build and start
-qfield-driver-cloud prune             # remove stacks of older releases
-qfield-driver-cloud down
-qfield-driver-cloud up --source-dir ~/src/QFieldCloud  # a checkout of your own
+qfdc ref                                # what `hosted` resolves to
+qfdc ref --check v26.30                 # exit 1 when the pinned tag is not hosted
+qfdc up --ref latest                    # build and start
+qfdc up --source-dir ~/src/QFieldCloud  # a checkout of your own
+qfdc down
+qfdc prune                              # remove the stacks of older releases
 ```
 
-`qfdc` is a short alias of `qfield-driver-cloud`.
+`qfdc` is short for `qfield-driver-cloud`. `up` and `down` take `--port-offset`, see
+below.
 
-The stack runs on `https://localhost:8543` with a self-signed certificate. QField
-accepts it, it ignores TLS errors on hosts outside `.qfield.cloud`. Overrides
-applied to the upstream compose files:
+### Several stacks at once
+
+Runs on one stack share its admin token, and one run's login ends the other's session
+(`Token has expired`). Give each parallel run, such as each git worktree, a stack of
+its own with a port offset:
+
+```python
+stack = QFieldCloudStack.with_offset(resolve_ref("hosted"), default_cache_dir(), 10)
+```
+
+- Every port moves up by the offset and the compose project gets the suffix `-10`.
+  Explicit ports and `name` still win, offset 0 is the plain stack. `local()` takes an
+  `offset` too, and the command line `--port-offset` or `QFIELDCLOUD_PORT_OFFSET`.
+- Use multiples of 10 up to 50. Other offsets can collide: at offset 0 the stack uses
+  the host ports 8109, 8113, 8180 (and 8182 to 8184 for the mail test server), 8432
+  and 8543.
+- Each offset builds its own images, so its first start is a long build and takes
+  extra GB.
+- Stacks of one release share the checkout, each with its own `.env.<project>` and
+  services override. `qfdc prune` removes the offset stacks of an old release too.
+
+### In a container
+
+The stack's containers are siblings started by the host's engine, which resolves every
+bind mount on the host. When the tests run in a container:
+
+- Mount the engine socket, the repository and the qfield-fetch cache at their host paths.
+- Set `DOCKER_HOST=unix://<host socket path>`.
+
+Without `DOCKER_HOST`, `container_socket()` warns inside a container. When the worker
+cannot reach the engine, `up()` raises an error naming the socket, instead of package
+jobs staying pending. An example Containerfile, entrypoint, compose file and Makefile
+target are in [docs/container.md](https://github.com/Joonalai/qfield-dev-tools/blob/main/components/qfield-driver/docs/container.md).
+
+### Changes to the upstream stack
 
 - Logging driver `json-file`, podman rejects the upstream `tag` option.
 - The worker mounts the docker or podman socket found on the host.
@@ -192,6 +217,3 @@ applied to the upstream compose files:
 - Images are tagged with the checkout's version from `git describe`, `v26.30` or
   `v26.30-3-gebfdcab`, and built again when it changes. Uncommitted edits in a
   checkout of your own add a hash of the diff. Older version tags are removed.
-
-When a package job fails with exit code 0, read the job `feedback` through
-`client.jobs(project_id)`, the worker log alone is misleading.

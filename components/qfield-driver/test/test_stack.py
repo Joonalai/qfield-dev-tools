@@ -358,3 +358,105 @@ def test_down_stale_keeps_a_ref_that_ends_like_an_offset_name(
     assert stack_module.down_stale(tmp_path, keep="v26.3.1") == ["v26.3"]
     downed = [command[3] for command in commands if "down" in command]
     assert downed == ["pytest_qfieldcloud_v26_3", offset_name]
+
+
+@pytest.fixture
+def no_docker_host(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.delenv("DOCKER_HOST", raising=False)
+
+
+@pytest.mark.usefixtures("no_docker_host")
+def test_socket_warns_in_a_container_without_docker_host(
+    monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
+) -> None:
+    monkeypatch.setattr(stack_module, "_in_container", lambda: True)
+
+    stack_module.container_socket()
+
+    assert "DOCKER_HOST=unix://<host socket path>" in caplog.text
+
+
+@pytest.mark.usefixtures("no_docker_host")
+def test_socket_is_quiet_on_the_host(
+    monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
+) -> None:
+    monkeypatch.setattr(stack_module, "_in_container", lambda: False)
+
+    stack_module.container_socket()
+
+    assert not caplog.text
+
+
+def test_socket_is_quiet_in_a_container_with_docker_host(
+    monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
+) -> None:
+    monkeypatch.setattr(stack_module, "_in_container", lambda: True)
+    monkeypatch.setenv("DOCKER_HOST", "unix:///run/user/1000/podman/podman.sock")
+
+    assert stack_module.container_socket() == "/run/user/1000/podman/podman.sock"
+    assert not caplog.text
+
+
+def _compose_returning(
+    stack: QFieldCloudStack, monkeypatch: pytest.MonkeyPatch, *, worker_ok: bool
+) -> list[tuple[str, ...]]:
+    calls: list[tuple[str, ...]] = []
+
+    def compose(*args: str, **_kwargs: object) -> subprocess.CompletedProcess[str]:
+        calls.append(args)
+        if args[0] == "config":
+            return subprocess.CompletedProcess(args, 0, "app\nworker_wrapper\n", "")
+        return subprocess.CompletedProcess(
+            args, 0 if worker_ok else 1, "", "PermissionError(13)"
+        )
+
+    monkeypatch.setattr(stack, "compose", compose)
+    return calls
+
+
+def test_worker_that_reaches_the_engine_passes(
+    stack: QFieldCloudStack, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    calls = _compose_returning(stack, monkeypatch, worker_ok=True)
+
+    stack._check_worker_engine()
+
+    assert any(call[:3] == ("exec", "-T", "worker_wrapper") for call in calls)
+
+
+def test_worker_that_cannot_reach_the_engine_raises_naming_the_socket(
+    stack: QFieldCloudStack, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _compose_returning(stack, monkeypatch, worker_ok=False)
+    stack.socket = "/host/engine.sock"
+
+    with pytest.raises(stack_module.StackError, match=r"/host/engine\.sock"):
+        stack._check_worker_engine()
+
+
+def test_up_raises_when_the_worker_cannot_reach_the_engine(
+    stack: QFieldCloudStack, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(stack, "_up", lambda: None)
+    _compose_returning(stack, monkeypatch, worker_ok=False)
+    stack.socket = "/host/engine.sock"
+
+    with pytest.raises(stack_module.StackError, match=r"/host/engine\.sock"):
+        stack.up()
+
+
+def test_up_skips_the_worker_check_without_a_worker(
+    stack: QFieldCloudStack, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(stack, "_up", lambda: None)
+    calls = []
+
+    def compose(*args: str, **_kwargs: object) -> subprocess.CompletedProcess[str]:
+        calls.append(args)
+        return subprocess.CompletedProcess(args, 1, "app\n", "")
+
+    monkeypatch.setattr(stack, "compose", compose)
+
+    stack.up()
+
+    assert calls == [("config", "--services")]
