@@ -78,9 +78,10 @@ def test_named_item_lookup_does_not_transfer_ownership_to_qml(
     tmp_path: "Path",
     qfield_geometry_highlighter_stub: "QFieldGeometryHighlighterStub",
 ):
-    """
-    Reaching the highlighter through ``iface.findItemByObjectName`` must leave
-    its ownership as ``CppOwnership``. JavaScriptOwnership would let the QML
+    """Finding the highlighter by object name must keep ``CppOwnership``.
+
+    Reaching it through ``iface.findItemByObjectName`` must not change its
+    ownership. JavaScriptOwnership would let the QML
     engine ``deleteLater()`` the underlying C++ object behind Python's back the
     next time the JS wrapper is collected, which would dangle the Python ref
     held in ``iface._named_items``.
@@ -111,9 +112,9 @@ def feature_form_driver(
     layer_points: "QgsVectorLayer",
     qgs_project_stub: "QgsProjectStub",
 ):
-    """
-    Drive ``featureForm`` through the canonical plugin pattern:
-    grab via ``iface.findItemByObjectName('featureForm')``, navigate to a
+    """Drive ``featureForm`` through the canonical plugin pattern.
+
+    Grab via ``iface.findItemByObjectName('featureForm')``, navigate to a
     feature by attribute filter, focus the matched row, and switch state.
     """
     probe_qml = tmp_path / "feature_form_probe.qml"

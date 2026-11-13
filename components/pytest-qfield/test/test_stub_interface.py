@@ -48,8 +48,10 @@ if TYPE_CHECKING:
 
 @pytest.fixture
 def qfield_map_canvas_stub() -> QFieldMapCanvasStub:
-    """Override the default fixture: use identity ``screenToCoordinate`` so
-    the QML signal-propagation tests can assert on the exact emitted point."""
+    """Override the default fixture with an identity ``screenToCoordinate``.
+
+    This way the QML signal-propagation tests can assert on the exact emitted point.
+    """
     return QFieldMapCanvasStub()
 
 
@@ -245,9 +247,9 @@ def test_map_layers_by_name_pins_layer_stub_ownership(
     layer_points: "QgsVectorLayer",
     qgs_project_stub: "QgsProjectStub",
 ):
-    """
-    Layer stubs returned from ``mapLayersByName`` must be pinned to
-    ``CppOwnership`` and retained on ``QgsProjectStub``. Otherwise QML's JS
+    """Layer stubs from ``mapLayersByName`` must be pinned and retained.
+
+    They must use ``CppOwnership`` and be kept on ``QgsProjectStub``. Otherwise QML's JS
     engine treats them as JS-owned, Python GCs the wrapper after the slot
     returns, and a subsequent slot handed the bare QObject back rebuilds a
     plain wrapper without the ``qgis_layer`` attribute — breaking e.g.
@@ -287,8 +289,9 @@ def test_get_feature_pins_feature_and_geometry_stubs(
     layer_points: "QgsVectorLayer",
     qgs_project_stub: "QgsProjectStub",
 ):
-    """
-    Companion to ``mapLayersByName``: ``QgsVectorLayerStub.getFeature`` and
+    """Feature and geometry stubs must be pinned and retained too.
+
+    Like ``mapLayersByName``, ``QgsVectorLayerStub.getFeature`` and
     ``QgsFeatureStub.geometry`` also hand fresh stubs to QML and need the
     same pin + retain treatment so the Python ``qgis_feature`` /
     ``qgis_geometry`` attributes survive a GC cycle.
@@ -381,9 +384,11 @@ def test_delete_feature_keeps_open_edit_session_uncommitted(
     qgs_project_stub: "QgsProjectStub",
     qfield_layer_utils_stub: "QFieldLayerUtilsStub",
 ):
-    """When the caller is already editing and ``flushBuffer`` is false, the
-    delete stays in the edit buffer: the layer keeps editing and a rollback
-    restores the feature."""
+    """Keep the delete in the edit buffer when ``flushBuffer`` is false.
+
+    When the caller is already editing, the layer keeps editing and a rollback
+    restores the feature.
+    """
     assert qgs_project_stub.qgis_project.addMapLayer(layer_points)
     [layer_stub] = qgs_project_stub.mapLayersByName("points")
     fid = layer_points.allFeatureIds()[0]

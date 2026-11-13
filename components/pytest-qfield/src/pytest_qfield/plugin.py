@@ -61,9 +61,9 @@ _QFIELD_SOURCE_DIR_ENV = "QFIELD_SOURCE_DIR"
 _QFIELD_SOURCE_DIR_KEY = "qfield_source_dir"
 _DEPRECATED_QFIELD_IMPORTS_DIR_ENV = "QFIELD_IMPORTS_DIR"
 _DEPRECATED_QFIELD_IMPORTS_DIR_KEY = "qfield_imports_dir"
-# QField <= 4.2
+# Layout of QField 4.2 and older
 _LEGACY_QML_IMPORTS_DIR = Path("src/qml/imports")
-# QField >= 4.3
+# Layout of QField 4.3 and newer
 _GUI_QML_DIR = Path("src/gui/qml")
 
 
@@ -74,12 +74,12 @@ def qapp_args() -> list[str]:
 
 @pytest.fixture
 def qfield_new_project(qgis_new_project: "QgsProject") -> None:  # noqa: ARG001
-    """Initialize new QField project"""
+    """Initialize new QField project."""
     return
 
 
 @pytest.fixture
-def qfield_bot(  # noqa: PLR0913
+def qfield_bot(  # noqa: PLR0913, PLR0917
     qgis_app: "QApplication",
     qgis_parent: QWidget,
     qgis_canvas: "QgsMapCanvas",
@@ -167,24 +167,21 @@ def qfield_bot(  # noqa: PLR0913
 
 @pytest.fixture
 def main_window_qml_path() -> Path:
-    """
-    Path to a file with QML Code of the MainWindow
+    """Path to a file with QML Code of the MainWindow.
 
     Feel free to override this fixture to use a custom QML code for the MainWindow.
     """
     main_window_qml_path = Path(__file__).parent / "main_window.qml"
     if not main_window_qml_path.exists():
-        raise FileNotFoundError(
-            f"QML path for main_window.qml cannot be found in {main_window_qml_path}!"
-        )
+        msg = f"QML path for main_window.qml cannot be found in {main_window_qml_path}!"
+        raise FileNotFoundError(msg)
 
     return main_window_qml_path
 
 
 @pytest.fixture
 def qfield_iface(qgis_iface: "QgisInterface") -> QFieldAppInterfaceStub:
-    """
-    Stub implementation for QFieldAppInterface.
+    """Stub implementation for QFieldAppInterface.
 
     Override this fixture to use an extended version of the class if needed.
     """
@@ -193,8 +190,7 @@ def qfield_iface(qgis_iface: "QgisInterface") -> QFieldAppInterfaceStub:
 
 @pytest.fixture
 def qfield_platform_utilities_stub() -> QFieldPlatformUtilitiesStub:
-    """
-    Stub implementation for QFieldPlatformUtilities.
+    """Stub implementation for QFieldPlatformUtilities.
 
     Override this fixture to use an extended version of the class if needed.
     """
@@ -203,8 +199,7 @@ def qfield_platform_utilities_stub() -> QFieldPlatformUtilitiesStub:
 
 @pytest.fixture
 def qfield_settings_stub(tmp_path: Path) -> QSettingsStub:
-    """
-    Stub implementation for QSettings (the QML `settings` global).
+    """Stub implementation for QSettings (the QML `settings` global).
 
     QField plugins use the shared `settings` store as a cross-plugin channel
     (e.g. a project form button writes a token that the plugin polls for).
@@ -217,8 +212,7 @@ def qfield_settings_stub(tmp_path: Path) -> QSettingsStub:
 
 @pytest.fixture
 def qgs_project_stub() -> QgsProjectStub:
-    """
-    Stub implementation for QgsProject (qgisProject in QML).
+    """Stub implementation for QgsProject (qgisProject in QML).
 
     Override this fixture to use an extended version of the class if needed.
     """
@@ -227,8 +221,7 @@ def qgs_project_stub() -> QgsProjectStub:
 
 @pytest.fixture
 def qfield_string_utils_stub() -> QFieldStringUtilsStub:
-    """
-    Stub implementation for StringUtils.
+    """Stub implementation for StringUtils.
 
     Override this fixture to use an extended version of the class if needed.
     """
@@ -237,8 +230,7 @@ def qfield_string_utils_stub() -> QFieldStringUtilsStub:
 
 @pytest.fixture(autouse=True)
 def qfield_layer_utils_stub() -> Iterator[QFieldLayerUtilsStub]:
-    """
-    Stub implementation for LayerUtils.
+    """Stub implementation for LayerUtils.
 
     Override this fixture to use an extended version of the class if needed.
     """
@@ -248,15 +240,15 @@ def qfield_layer_utils_stub() -> Iterator[QFieldLayerUtilsStub]:
     try:
         for iterator in iterators:
             if not iterator.closed:
-                raise AssertionError("Iterator was not closed")
+                msg = "Iterator was not closed"
+                raise AssertionError(msg)
     finally:
         layer_utils_stub.clear_iterators()
 
 
 @pytest.fixture
 def qfield_feature_utils_stub() -> QFieldFeatureUtilsStub:
-    """
-    Stub implementation for FeatureUtils.
+    """Stub implementation for FeatureUtils.
 
     Override this fixture to use an extended version of the class if needed.
     """
@@ -265,8 +257,7 @@ def qfield_feature_utils_stub() -> QFieldFeatureUtilsStub:
 
 @pytest.fixture
 def qfield_geometry_utils_stub() -> QFieldGeometryUtilsStub:
-    """
-    Stub implementation for GeometryUtils.
+    """Stub implementation for GeometryUtils.
 
     Override this fixture to use an extended version of the class if needed.
     """
@@ -275,8 +266,7 @@ def qfield_geometry_utils_stub() -> QFieldGeometryUtilsStub:
 
 @pytest.fixture
 def qfield_theme_stub() -> QFieldThemeStub:
-    """
-    Stub implementation for Theme.
+    """Stub implementation for Theme.
 
     Override this fixture to use an extended version of the class if needed.
     """
@@ -285,8 +275,7 @@ def qfield_theme_stub() -> QFieldThemeStub:
 
 @pytest.fixture
 def qfield_positioning_stub() -> QFieldPositioningStub:
-    """
-    Stub implementation for Positioning (QML `positionSource`).
+    """Stub implementation for Positioning (QML `positionSource`).
 
     The default stub reports `active = True` and a position at the origin.
     Override this fixture to inject custom coordinates or simulate inactive
@@ -297,8 +286,7 @@ def qfield_positioning_stub() -> QFieldPositioningStub:
 
 @pytest.fixture
 def qfield_geometry_highlighter_stub() -> QFieldGeometryHighlighterStub:
-    """
-    Stub implementation for GeometryHighlighter.
+    """Stub implementation for GeometryHighlighter.
 
     The instance is auto-registered on the iface stub under the
     `geometryHighlighter` name. Override this fixture to use an extended
@@ -309,8 +297,7 @@ def qfield_geometry_highlighter_stub() -> QFieldGeometryHighlighterStub:
 
 @pytest.fixture
 def qfield_feature_list_form_stub() -> QFieldFeatureListFormStub:
-    """
-    Stub implementation for FeatureListForm (QML objectName `featureForm`).
+    """Stub implementation for FeatureListForm (QML objectName `featureForm`).
 
     The instance is auto-registered on the iface stub under the `featureForm`
     name so plugins can locate it via `iface.findItemByObjectName`. Override
@@ -321,9 +308,7 @@ def qfield_feature_list_form_stub() -> QFieldFeatureListFormStub:
 
 @pytest.fixture
 def qfield_overlay_feature_form_drawer_stub() -> QFieldOverlayFeatureFormDrawerStub:
-    """
-    Stub implementation for overlayFeatureFormDrawer (QML objectName
-    `overlayFeatureFormDrawer`).
+    """Stub implementation for the QML `overlayFeatureFormDrawer` item.
 
     The instance is auto-registered on the iface stub under the
     `overlayFeatureFormDrawer` name so plugins can locate it via
@@ -335,9 +320,9 @@ def qfield_overlay_feature_form_drawer_stub() -> QFieldOverlayFeatureFormDrawerS
 
 @pytest.fixture
 def qfield_map_canvas_stub(qgis_canvas: "QgsMapCanvas") -> QFieldMapCanvasStub:
-    """
-    Stub implementation for the QML MapCanvas item returned by
-    `iface.mapCanvas()`.
+    """Stub implementation for the QML MapCanvas item.
+
+    It is returned by `iface.mapCanvas()`.
 
     The default stub wires the real pytest-qgis `qgis_canvas`.
     """
@@ -345,7 +330,7 @@ def qfield_map_canvas_stub(qgis_canvas: "QgsMapCanvas") -> QFieldMapCanvasStub:
 
 
 @pytest.fixture(autouse=True)
-def _attach_default_iface_stubs(  # noqa: PLR0913
+def _attach_default_iface_stubs(  # noqa: PLR0913, PLR0917
     qfield_iface: QFieldAppInterfaceStub,
     qfield_positioning_stub: QFieldPositioningStub,
     qfield_geometry_highlighter_stub: QFieldGeometryHighlighterStub,
@@ -353,8 +338,7 @@ def _attach_default_iface_stubs(  # noqa: PLR0913
     qfield_overlay_feature_form_drawer_stub: QFieldOverlayFeatureFormDrawerStub,
     qfield_map_canvas_stub: QFieldMapCanvasStub,
 ) -> None:
-    """
-    Auto-wire default stubs onto the iface before QML loads:
+    """Auto-wire default stubs onto the iface before QML loads.
 
     - ``positionSource``, ``geometryHighlighter``, ``featureForm`` and
       ``overlayFeatureFormDrawer`` are registered as named items reachable via
@@ -380,16 +364,17 @@ def _attach_default_iface_stubs(  # noqa: PLR0913
 
 @pytest.fixture
 def qfield_qml_extra_context_properties() -> dict[str, object]:
-    """
-    Override this fixture to provide extra context properties for QField QML files.
+    """Provide extra context properties for QField QML files.
+
+    Override this fixture to add your own.
     """
     return {}
 
 
 @pytest.fixture
 def register_qfield_resources() -> None:
-    """
-    Registers compiled resources.
+    """Register compiled resources.
+
     Override this fixture to provide your own compiled resources.
     """
     # Register /gml
@@ -398,8 +383,8 @@ def register_qfield_resources() -> None:
 
 @pytest.fixture(scope="session")
 def register_qfield_types() -> None:
-    """
-    Registers qfield types used in QField plugin.
+    """Register qfield types used in QField plugin.
+
     Override this fixture to provide more types needed.
 
     Check this file for a complete list
@@ -414,8 +399,8 @@ def register_qfield_types() -> None:
 
 @pytest.fixture(scope="session")
 def register_qgis_types() -> None:
-    """
-    Registers qgus types used in QField plugin.
+    """Register qgis types used in QField plugin.
+
     Override this fixture to provide more types needed.
 
     Check this file for a complete list
@@ -475,10 +460,11 @@ def _get_qfield_source_path(config: "pytest.Config") -> Path:
                 qfield_path_config = deprecated_value
                 break
     if not qfield_path_config:
-        raise ValueError(
+        msg = (
             f"No {_QFIELD_SOURCE_DIR_KEY} ini value "
             f"or {_QFIELD_SOURCE_DIR_ENV} environment variable set!"
         )
+        raise ValueError(msg)
 
     qfield_path = Path(qfield_path_config).resolve()
     for qml_dir in (_LEGACY_QML_IMPORTS_DIR, _GUI_QML_DIR):
@@ -489,7 +475,8 @@ def _get_qfield_source_path(config: "pytest.Config") -> Path:
         not (qfield_path / _GUI_QML_DIR).exists()
         and not (qfield_path / _LEGACY_QML_IMPORTS_DIR).exists()
     ):
-        raise ValueError(f"{qfield_path} is not a QField source checkout!")
+        msg = f"{qfield_path} is not a QField source checkout!"
+        raise ValueError(msg)
     return qfield_path
 
 
@@ -548,16 +535,18 @@ def _load_qml_overlay_widget(
     qml_overlay_widget.setResizeMode(QQuickWidget.ResizeMode.SizeRootObjectToView)
     qml_overlay_widget.setAutoFillBackground(False)
     qml_overlay_widget.setClearColor(Qt.GlobalColor.transparent)
-    qml_overlay_widget.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground, True)
-    qml_overlay_widget.setAttribute(Qt.WidgetAttribute.WA_AlwaysStackOnTop, True)
+    qml_overlay_widget.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
+    qml_overlay_widget.setAttribute(Qt.WidgetAttribute.WA_AlwaysStackOnTop)
     qml_overlay_widget.setStyleSheet("background: transparent;")
     qml_overlay_widget.setSource(QUrl.fromLocalFile(str(main_window_qml_path)))
 
     if qml_overlay_widget.status() == QQuickWidget.Status.Error:
         errors = [error.toString() for error in qml_overlay_widget.errors()]
-        raise ValueError(f"QML file {main_window_qml_path} failed to load: {errors}")
+        msg = f"QML file {main_window_qml_path} failed to load: {errors}"
+        raise ValueError(msg)
 
     root_object = qml_overlay_widget.rootObject()
     if root_object is None:
-        raise ValueError(f"QML file {main_window_qml_path} did not load successfully!")
+        msg = f"QML file {main_window_qml_path} did not load successfully!"
+        raise ValueError(msg)
     return qml_overlay_widget, root_object

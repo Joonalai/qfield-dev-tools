@@ -16,9 +16,9 @@
 # You should have received a copy of the GNU General Public License
 # along with pytest-qfield.  If not, see <https://www.gnu.org/licenses/>.
 
-"""
-Covers the stub surface that lets a project form button trigger a plugin action
-through the shared ``settings`` global (the only channel that reaches a cloud
+"""Cover the channel from a project form button to a plugin action.
+
+The stub surface lets the button trigger a plugin action through the shared ``settings`` global (the only channel that reaches a cloud
 "project plugin"): the button writes a token, the plugin polls and consumes it,
 then reads the focused occurrence from ``featureForm.selection``.
 """
@@ -124,9 +124,9 @@ def test_settings_poll_consumes_token_and_reads_focused_occurrence(
     qgs_project_stub: "QgsProjectStub",
     qfield_settings_stub: QSettingsStub,
 ):
-    """
-    Exercises the whole channel end to end: a Timer-driven poll (as the plugin
-    runs) reads the token a form button wrote, consumes it, and resolves the
+    """Exercise the whole channel end to end.
+
+    A Timer-driven poll (as the plugin runs) reads the token a form button wrote, consumes it, and resolves the
     focused feature — the path that is otherwise only verified manually.
     """
     assert qgs_project_stub.qgis_project.addMapLayer(layer_points)

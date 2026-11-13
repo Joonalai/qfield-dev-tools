@@ -39,8 +39,10 @@ def load_stub_plugin_on_known_extent(
     qgs_project_stub: "QgsProjectStub",
     qgis_canvas: "QgsMapCanvas",
 ):
-    """Stub-tester plugin with the qgis_canvas pinned to a known extent so
-    ``click_map_at`` produces predictable screen coords."""
+    """Load the stub-tester plugin with the qgis_canvas at a known extent.
+
+    The fixed extent makes ``click_map_at`` produce predictable screen coords.
+    """
     qgis_canvas.show()
     qgis_canvas.resize(200, 200)
     qgis_canvas.setExtent(QgsRectangle(0.0, 0.0, 200.0, 200.0))

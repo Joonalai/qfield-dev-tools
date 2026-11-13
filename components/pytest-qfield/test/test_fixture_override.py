@@ -15,8 +15,7 @@
 #
 # You should have received a copy of the GNU General Public License
 # along with pytest-qfield.  If not, see <https://www.gnu.org/licenses/>.
-"""
-Example: overriding stub fixtures to customize QML behavior.
+"""Example: overriding stub fixtures to customize QML behavior.
 
 All stub fixtures provided by pytest-qfield can be overridden in your
 conftest.py.  This file demonstrates the pattern by subclassing

@@ -15,8 +15,7 @@
 #
 # You should have received a copy of the GNU General Public License
 # along with pytest-qfield.  If not, see <https://www.gnu.org/licenses/>.
-"""
-Stub implementations of the QGIS classes QField exposes to QML.
+"""Stub implementations of the QGIS classes QField exposes to QML.
 
 Slots and properties that hand fresh ``QObject`` subclasses to QML must pin
 ``CppOwnership`` and append the stub to a ``_pinned_*_stubs`` list on the
@@ -44,9 +43,7 @@ if TYPE_CHECKING:
 
 
 class QgsMapLayerStub(QObject):
-    """
-    Stub implementation of QgsMapLayer.
-    """
+    """Stub implementation of QgsMapLayer."""
 
     def __init__(self, qgis_layer: "QgsMapLayer") -> None:
         super().__init__(parent=qgis_layer)
@@ -72,9 +69,7 @@ class QgsMapLayerStub(QObject):
 
 
 class QgsVectorLayerStub(QgsMapLayerStub):
-    """
-    Stub implementation of QgsVectorLayer.
-    """
+    """Stub implementation of QgsVectorLayer."""
 
     featureAdded = pyqtSignal(int)
     featureDeleted = pyqtSignal(int)
@@ -96,7 +91,7 @@ class QgsVectorLayerStub(QgsMapLayerStub):
 
     @pyqtSlot(result=bool)
     def commitChanges(self) -> bool:
-        # TODO: stop editing or not?
+        # TODO(Joonalai): stop editing or not?
         return self.qgis_layer.commitChanges(stopEditing=False)
 
     @pyqtSlot(int, result=QObject)
@@ -109,9 +104,7 @@ class QgsVectorLayerStub(QgsMapLayerStub):
 
 
 class QgsRasterLayerStub(QgsMapLayerStub):
-    """
-    Stub implementation of QgsRasterLayer.
-    """
+    """Stub implementation of QgsRasterLayer."""
 
     featureAdded = pyqtSignal(int)
 
@@ -121,9 +114,7 @@ class QgsRasterLayerStub(QgsMapLayerStub):
 
 
 class QgsProjectStub(QObject):
-    """
-    Stub implementation for QgsProject (qgisProject in QML).
-    """
+    """Stub implementation for QgsProject (qgisProject in QML)."""
 
     def __init__(self, qgis_project: "QgsProject") -> None:
         super().__init__(parent=qgis_project)
