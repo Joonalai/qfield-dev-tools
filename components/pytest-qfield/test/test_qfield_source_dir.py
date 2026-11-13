@@ -19,20 +19,30 @@ from pathlib import Path
 
 import pytest
 
+from pytest_qfield import plugin
 from pytest_qfield.plugin import _get_qfield_source_path
 
 
 class _ConfigStub:
     def __init__(self, ini_values: dict[str, str]) -> None:
         self._ini_values = ini_values
+        self.rootpath = Path.cwd()
 
     def getini(self, name: str) -> str:
         return self._ini_values.get(name, "")
 
+    def getoption(self, name: str) -> None:  # noqa: ARG002
+        return None
+
 
 @pytest.fixture
 def qfield_checkout(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
-    for env_var in ("QFIELD_SOURCE_DIR", "QFIELD_IMPORTS_DIR"):
+    for env_var in (
+        "QFIELD_SOURCE_DIR",
+        "QFIELD_IMPORTS_DIR",
+        "QFIELD_VERSION",
+        "QFIELD_FETCH_CACHE_DIR",
+    ):
         monkeypatch.delenv(env_var, raising=False)
     # Resolved because the plugin resolves, and tmp dirs can be symlinks (macOS)
     qfield_checkout = tmp_path.resolve()
@@ -93,8 +103,35 @@ def test_deprecated_ini_value_is_supported_with_warning(qfield_checkout: Path) -
         assert _get_qfield_source_path(config) == qfield_checkout
 
 
+def test_source_is_fetched_for_the_configured_version(
+    qfield_checkout: Path, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    fetched: list[tuple[str, Path]] = []
+
+    def qfield_source(version: str, cache_dir: Path) -> Path:
+        fetched.append((version, cache_dir))
+        return qfield_checkout
+
+    monkeypatch.setattr(plugin, "qfield_source", qfield_source)
+    monkeypatch.setenv("QFIELD_VERSION", "4.2.9")
+    monkeypatch.setenv("QFIELD_FETCH_CACHE_DIR", str(tmp_path / "cache"))
+
+    assert _get_qfield_source_path(_ConfigStub({})) == qfield_checkout
+    assert fetched == [("4.2.9", tmp_path / "cache")]
+
+
+def test_source_dir_takes_precedence_over_the_version(
+    qfield_checkout: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(plugin, "qfield_source", pytest.fail)
+    monkeypatch.setenv("QFIELD_VERSION", "4.2.9")
+    monkeypatch.setenv("QFIELD_SOURCE_DIR", str(qfield_checkout))
+
+    assert _get_qfield_source_path(_ConfigStub({})) == qfield_checkout
+
+
 def test_missing_source_dir_raises(qfield_checkout: Path) -> None:  # noqa: ARG001
-    with pytest.raises(ValueError, match="QFIELD_SOURCE_DIR"):
+    with pytest.raises(ValueError, match=r"QFIELD_SOURCE_DIR.*QFIELD_VERSION"):
         _get_qfield_source_path(_ConfigStub({}))
 
 

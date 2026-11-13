@@ -51,7 +51,7 @@ When adding a new stub category, follow whichever pattern matches how QField QML
 
 ## QField source dependency
 
-The plugin loads QML from QField's source tree — there's no way around having a checkout. `QFIELD_SOURCE_DIR` must point at the QField checkout root (a trailing `src/qml/imports` or `src/gui/qml` is stripped; the layout is detected) and the checkout's tag must match the QField version you're testing against. `.env.example` in the repository root has the canonical variable name.
+The plugin loads QML from QField's source tree — there's no way around having a checkout. With `QFIELD_VERSION` (or `--qfield-version`, `qfield_version`) qfield-fetch clones that ref into its cache. A configured `QFIELD_SOURCE_DIR` wins over the version and must point at the QField checkout root (a trailing `src/qml/imports` or `src/gui/qml` is stripped; the layout is detected) and the checkout's tag must match the QField version you're testing against. `.env.example` in the repository root has the canonical variable name.
 
 ## Tests
 

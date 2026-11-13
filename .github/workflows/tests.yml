@@ -42,17 +42,11 @@ jobs:
 
     steps:
       - uses: actions/checkout@v6
-      - name: Checkout QField
-        uses: actions/checkout@v6
-        with:
-          repository: opengisch/QField
-          path: QField
-          ref: ${{ matrix.qfield-refs }}
 
       - name: Install venv
         run: |
           apt update
-          apt install -y python3-venv curl
+          apt install -y python3-venv curl git
 
       - name: Create virtualenv and install dependencies
         run: |
@@ -66,7 +60,7 @@ jobs:
 
       - name: Run tests
         env:
-          QFIELD_SOURCE_DIR: "${{ github.workspace }}/QField"
+          QFIELD_VERSION: ${{ matrix.qfield-refs }}
           QGIS_IN_CI: 1
         run: |
           .venv/bin/uv run --package pytest-qfield pytest -v --qgis_disable_gui components/pytest-qfield/test

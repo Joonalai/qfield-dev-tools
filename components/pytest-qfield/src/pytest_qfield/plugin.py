@@ -48,6 +48,8 @@ from pytest_qfield.stub_interface.qfield_stubs import (
     QFieldThemeStub,
 )
 from pytest_qfield.stub_interface.qgis_stubs import QgsProjectStub, QSettingsStub
+from qfield_fetch import qfield_source
+from qfield_fetch.pytest_plugin import configured_cache_dir, configured_version
 
 if TYPE_CHECKING:
     from _pytest.config import Parser
@@ -459,10 +461,14 @@ def _get_qfield_source_path(config: "pytest.Config") -> Path:
                 )
                 qfield_path_config = deprecated_value
                 break
+    if not qfield_path_config and (version := configured_version(config)):
+        qfield_path_config = str(qfield_source(version, configured_cache_dir(config)))
     if not qfield_path_config:
         msg = (
             f"No {_QFIELD_SOURCE_DIR_KEY} ini value "
-            f"or {_QFIELD_SOURCE_DIR_ENV} environment variable set!"
+            f"or {_QFIELD_SOURCE_DIR_ENV} environment variable set, "
+            "and no QField version to fetch the source for "
+            "(--qfield-version, QFIELD_VERSION or qfield_version)!"
         )
         raise ValueError(msg)
 

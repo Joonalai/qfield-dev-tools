@@ -219,11 +219,30 @@ pip install pytest-qfield
 If your QGIS PyQt6 lacks QML bindings (e.g. Debian, Ubuntu), the import error shows
 the command to install a matching PyQt6 wheel.
 
+### Configure the QField version
+
+The plugin loads QML from QField source code. Give the QField version to test against, and
+[qfield-fetch](https://github.com/Joonalai/qfield-dev-tools/tree/main/components/qfield-fetch) clones that version once into its cache
+(`~/.cache/qfield-fetch`). A tag or a branch such as `release-4_3` works as well.
+
+```bash
+pytest --qfield-version 4.2.9
+QFIELD_VERSION=4.2.9 pytest
+```
+
+```ini
+# pyproject.toml
+[tool.pytest.ini_options]
+qfield_version = 4.2.9
+```
+
+A branch is cloned once too, refresh it with `qfield-fetch source <branch> --update`.
+
 ### Configure QField source path
 
-The plugin loads QML from QField source code. Clone [QField](https://github.com/opengisch/QField),
-check out the target QField tag and point the plugin to the clone either with an environment variable
-or a `pytest.ini` value. Both QField 4.3+ (`src/gui/qml`) and older (`src/qml/imports`) layouts are detected.
+To use a checkout of your own instead, point the plugin to it either with an environment variable
+or a `pytest.ini` value. It wins over the version. Both QField 4.3+ (`src/gui/qml`) and older
+(`src/qml/imports`) layouts are detected.
 
 ```bash
 QFIELD_SOURCE_DIR=/absolute/path/to/QField pytest
@@ -242,7 +261,7 @@ The former `QFIELD_IMPORTS_DIR` / `qfield_imports_dir` names still work but are 
 This project uses [uv](https://docs.astral.sh/uv/getting-started/installation/)
 to manage python packages. Make sure to have it installed first.
 
-- Clone [QField](https://github.com/opengisch/QField) source code somewhere and checkout the tag for requested QField version.
+- Set `QFIELD_VERSION` in `.env` (see `.env.example`), or clone [QField](https://github.com/opengisch/QField) source code somewhere, check out the tag for the requested QField version and set `QFIELD_SOURCE_DIR`.
 - In the repository root, copy .env.example to .env and fill the missing values
 - Create a venv that is aware of system QGIS libraries: `uv venv --system-site-packages`. Make sure to use same Python
   executable as QGIS.
