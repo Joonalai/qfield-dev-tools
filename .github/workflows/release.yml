@@ -48,3 +48,9 @@ jobs:
         with:
           component: qfield-driver
           github_token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Release pytest-qfield-e2e
+        uses: ./.github/actions/release-component
+        with:
+          component: pytest-qfield-e2e
+          github_token: ${{ secrets.GITHUB_TOKEN }}
