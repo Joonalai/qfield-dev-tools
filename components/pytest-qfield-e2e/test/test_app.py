@@ -119,6 +119,20 @@ def test_settings_are_seeded(qfield_app: QFieldApp) -> None:
     assert qfield_app.eval("return settings.value('pytest/text', '')") == 'a, "b" c:\\d'
 
 
+def test_first_run_intros_stay_closed(
+    qfield_app_factory: Callable[..., QFieldApp],
+) -> None:
+    # A device of its own, a reused one may have opened the dashboard before.
+    app = qfield_app_factory("intros")
+    assert not app.eval("return settings.valueBool('/QField/showDashboardGuide', true)")
+
+    app.eval("find('dashBoard').open();")
+    actions.wait_visible(app, "dashBoard")
+    time.sleep(1)
+
+    assert not actions.is_visible(app, "dashboardTour")
+
+
 def test_device_restarts_on_its_profile(
     qfield_app_factory: Callable[..., QFieldApp],
 ) -> None:
