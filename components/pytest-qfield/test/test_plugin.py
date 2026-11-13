@@ -15,6 +15,7 @@
 #
 # You should have received a copy of the GNU General Public License
 # along with qfield-dev-tools.  If not, see <https://www.gnu.org/licenses/>.
+import os
 from typing import TYPE_CHECKING
 
 import pytest
@@ -46,6 +47,8 @@ def test_qfield_bot_should_load_plugin(
         assert qfield_bot.iface.toast_messages == ["Toast displayed!"]
 
 
+# The OpenStreetMap layer is invalid on some local QGIS installs, CI runs it.
+@pytest.mark.skipif(not os.environ.get("QGIS_IN_CI"), reason="needs the CI QGIS")
 @pytest.mark.usefixtures(
     "load_simple_plugin_without_project_loaded_signal", "project_loaded"
 )
