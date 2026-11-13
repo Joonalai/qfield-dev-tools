@@ -44,6 +44,7 @@ if TYPE_CHECKING:
     from qfield_driver.cloud.client import QFieldCloudClient
 
 REF_ENV = "QFIELDCLOUD_REF"
+PORT_OFFSET_ENV = "QFIELDCLOUD_PORT_OFFSET"
 WORKER_ENV = "PYTEST_XDIST_WORKER"
 USED_STACK = pytest.StashKey[dict[str, Any]]()
 DEFAULT_PASSWORD = "pytest-qfield-123"  # noqa: S105 disposable local test stack
@@ -72,6 +73,11 @@ def pytest_addoption(parser: pytest.Parser) -> None:
         "qfieldcloud_source_dir", "QFieldCloud checkout, relative to the rootdir."
     )
     parser.addini("qfieldcloud_https_port", "Host HTTPS port, 8543 by default.")
+    parser.addini(
+        "qfieldcloud_port_offset",
+        "Move every stack port and the compose project by this offset."
+        f" Env {PORT_OFFSET_ENV}.",
+    )
 
 
 def pytest_configure(config: pytest.Config) -> None:
@@ -141,6 +147,13 @@ def local_source(config: pytest.Config) -> Path | None:
     return None
 
 
+def port_offset(config: pytest.Config) -> int:
+    """Return the configured offset of the stack's ports, 0 by default."""
+    return int(
+        os.environ.get(PORT_OFFSET_ENV) or config.getini("qfieldcloud_port_offset") or 0
+    )
+
+
 @pytest.fixture(scope="session")
 def qfieldcloud_ref(pytestconfig: pytest.Config) -> str:
     """Return the QFieldCloud tag under test, resolved from `hosted` or `latest`.
@@ -168,9 +181,13 @@ def qfieldcloud_stack(
     `.env` values.
     """
     if source := local_source(pytestconfig):
-        stack = QFieldCloudStack.local(source, qfield_fetch_cache_dir)
+        stack = QFieldCloudStack.local(
+            source, qfield_fetch_cache_dir, offset=port_offset(pytestconfig)
+        )
     else:
-        stack = QFieldCloudStack(qfieldcloud_ref, qfield_fetch_cache_dir)
+        stack = QFieldCloudStack.with_offset(
+            qfieldcloud_ref, qfield_fetch_cache_dir, port_offset(pytestconfig)
+        )
     if port := pytestconfig.getini("qfieldcloud_https_port"):
         stack.https_port = int(port)
     stack.up()

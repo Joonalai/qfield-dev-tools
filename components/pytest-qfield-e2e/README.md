@@ -25,8 +25,8 @@ With the `cloud` extra (`pytest-qfield-e2e[cloud]`):
 
 | Fixture | Scope | What |
 | --- | --- | --- |
-| `qfieldcloud_ref` | session | QFieldCloud release: `hosted` (default), `latest` or a tag. `--qfieldcloud-ref`, env `QFIELDCLOUD_REF`, ini `qfieldcloud_ref`. With a checkout of your own (`--qfieldcloud-source-dir`, env `QFIELDCLOUD_SOURCE_DIR`, ini `qfieldcloud_source_dir`) it is `local-<directory>`, and the stack writes its `.env` and compose overrides into that checkout. |
-| `qfieldcloud_stack` | session | The official compose stack at that release, built and started once, then reused across sessions. `--qfieldcloud-down` removes it after the session. Ini `qfieldcloud_https_port` changes its HTTPS port. |
+| `qfieldcloud_ref` | session | QFieldCloud release: `hosted` (default), `latest` or a tag. `--qfieldcloud-ref`, env `QFIELDCLOUD_REF`, ini `qfieldcloud_ref`. With a checkout of your own (`--qfieldcloud-source-dir`, env `QFIELDCLOUD_SOURCE_DIR`, ini `qfieldcloud_source_dir`) it is `local-<directory>`, and the stack writes its `.env.<project>` and compose overrides into that checkout. |
+| `qfieldcloud_stack` | session | The official compose stack at that release, built and started once, then reused across sessions. `--qfieldcloud-down` removes it after the session. Ini `qfieldcloud_https_port` changes its HTTPS port. Ini `qfieldcloud_port_offset` or env `QFIELDCLOUD_PORT_OFFSET` (env wins) moves every port up by that offset and suffixes the compose project, see below. `qfieldcloud_https_port` overrides only the HTTPS port, after the offset. |
 | `qfieldcloud_admin` | session | REST client logged in as the admin. |
 | `qfieldcloud_user` | session | `user(name, password=...)` creates a user once and returns its client. |
 | `qfieldcloud_project` | function | `create(directory, name=None, collaborators=())` uploads and packages a project, deleted after the test. |
@@ -126,3 +126,10 @@ stack with the runner's docker.
   share one QFieldCloud stack and get their own users, `alice` becomes
   `alice_gw1` through `worker_username`, which the cloud fixtures apply.
   `--qfieldcloud-down` removes the stack once all workers are done.
+- Several worktrees can run side by side, each with its own stack: give each a
+  distinct `QFIELDCLOUD_PORT_OFFSET` (or ini `qfieldcloud_port_offset`), for example
+  `10`, which moves all five ports and suffixes the compose project. Runs that
+  share one stack share its one admin token, and one run's login invalidates the
+  other's (`Token has expired`), so they need distinct offsets. Use multiples of
+  10 up to 50, other offsets can make host ports collide, see
+  [Several stacks at once](https://github.com/Joonalai/qfield-dev-tools/tree/main/components/qfield-driver#several-stacks-at-once). Every offset builds its own images, a long first start and extra GB.
