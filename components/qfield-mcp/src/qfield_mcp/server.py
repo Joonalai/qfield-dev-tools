@@ -81,6 +81,20 @@ def tool(fn: Callable[..., Any]) -> Callable[..., Any]:
 # Devices
 
 
+def _app_run(version: str | None) -> Path:
+    local = os.environ.get(BINARY_ENV) if version is None else None
+    if not local:
+        return appimage(version or DEFAULT_VERSION)
+    try:
+        return local_app(local)
+    except FileNotFoundError as error:
+        msg = (
+            f"{error} (from ${BINARY_ENV} of the server's environment). "
+            f"Pass `version` to run a release instead, or fix or unset ${BINARY_ENV}."
+        )
+        raise FileNotFoundError(msg) from error
+
+
 @tool
 def start_device(  # noqa: PLR0913
     *,
@@ -102,8 +116,7 @@ def start_device(  # noqa: PLR0913
     """
     lock = devices.reserve(name)
     try:
-        local = os.environ.get(BINARY_ENV) if version is None else None
-        app_run = local_app(local) if local else appimage(version or DEFAULT_VERSION)
+        app_run = _app_run(version)
         app = QFieldApp(app_run, devices.work_dir / name, settings=settings)
         app.__enter__()
         try:
