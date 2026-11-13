@@ -169,6 +169,18 @@ def test_add_feature_and_change_geometry(
     ]
 
 
+def test_delete_feature_through_the_form_menu(
+    qfield_app: QFieldApp, project_file: Path
+) -> None:
+    actions.open_project(qfield_app, project_file)
+    before = actions.feature_count(qfield_app, POINTS)
+
+    actions.delete_feature(qfield_app, POINTS, "text_field = 'test'")
+
+    assert actions.feature_count(qfield_app, POINTS) == before - 1
+    assert actions.feature_count(qfield_app, POINTS, "text_field = 'test'") == 0
+
+
 def test_find_item_reaches_plugin_popups(qfield_app: QFieldApp, tmp_path: Path) -> None:
     plugin = tmp_path / "popup_plugin"
     plugin.mkdir()
