@@ -538,6 +538,79 @@ def close_feature_form(*, device: str = "device") -> str:
     return "closed"
 
 
+@tool
+def delete_feature(layer: str, expression: str, *, device: str = "device") -> str:
+    """Delete the first feature matching a QGIS expression, as a user would.
+
+    Opens its form, taps the form menu, `Delete Feature` and `OK`.
+    """
+    with devices.use(device) as app:
+        actions.delete_feature(app, layer, expression)
+    return "deleted"
+
+
+@tool
+def set_active_layer(layer: str, *, device: str = "device") -> str:
+    """Make a layer the one that digitizing adds features to."""
+    with devices.use(device) as app:
+        actions.set_active_layer(app, layer)
+    return "active"
+
+
+@tool
+def digitize_point(  # noqa: PLR0913
+    layer: str,
+    x: float,
+    y: float,
+    label: str,
+    value: Any,  # noqa: ANN401
+    *,
+    device: str = "device",
+) -> str:
+    """Add a point by tapping the map in digitize mode, fill one field and save.
+
+    The point must be on screen, use frame_map first. To fill several fields,
+    switch to digitize mode with eval_js, use tap_map, set_field and save_form.
+
+    :param x: Project CRS coordinate
+    :param label: The field to fill, its alias, its name when it has none
+    """
+    with devices.use(device) as app:
+        actions.digitize_point(app, layer, (x, y), label, value)
+    return "added"
+
+
+@tool
+def add_feature(
+    layer: str,
+    attributes: dict[str, Any],
+    *,
+    wkt: str | None = None,
+    device: str = "device",
+) -> str:
+    """Add a feature and commit it, as plugin JS does, without any form.
+
+    :param wkt: Geometry in the layer's CRS, `Point (385000 6672000)`
+    :param attributes: Values by field name
+    """
+    with devices.use(device) as app:
+        actions.add_feature(app, layer, wkt, attributes)
+    return "added"
+
+
+@tool
+def change_geometry(
+    layer: str, expression: str, wkt: str, *, device: str = "device"
+) -> str:
+    """Replace the geometry of the first feature matching an expression and save.
+
+    :param wkt: New geometry in the layer's CRS
+    """
+    with devices.use(device) as app:
+        actions.change_geometry(app, layer, expression, wkt)
+    return "changed"
+
+
 # QFieldCloud
 
 
