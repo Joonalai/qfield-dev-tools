@@ -43,6 +43,7 @@ apply when a tool call names no version or ref:
 | --- | --- |
 | `QFIELD_APP_BINARY` | An AppRun, an AppImage or a build of your own instead of release 4.2.9. `start_device` fails naming it when the path is not executable, pass `version` or unset it |
 | `QFIELDCLOUD_SOURCE_DIR` | A QFieldCloud checkout of your own for `cloud_up` instead of the hosted release |
+| `QFIELDCLOUD_PORT_OFFSET` | Moves every port and the compose project of `cloud_up` and `cloud_attach`, so stacks of parallel checkouts do not collide |
 
 ```bash
 claude mcp add qfield -e QFIELD_APP_BINARY=/path/to/AppRun -- uvx qfield-mcp
@@ -60,7 +61,7 @@ claude mcp add qfield -e QFIELD_APP_BINARY=/path/to/AppRun -- uvx qfield-mcp
 - `open_project`, `set_position`, `features`: open a project, feed a GNSS fix, read attributes.
 - `open_feature_form`, `set_field`, `save_form`, `close_feature_form`: edit through the real form. `set_field` and `save_form` use whichever form is open, an existing feature's or a new one's.
 - `set_active_layer`, `digitize_point`, `add_feature`, `change_geometry`, `delete_feature`: add a point by tapping the map, add one in code, move one and delete one through its form menu.
-- `cloud_up`, `cloud_login`, `cloud_download`, `cloud_synchronize`: a local QFieldCloud and devices synced with it. `cloud_download` can answer a project plugin's permission prompt, and `cloud_synchronize` reports how many deltas went up and their status.
+- `cloud_up`, `cloud_attach`, `cloud_status`, `cloud_login`, `cloud_download`, `cloud_synchronize`: a local QFieldCloud and devices synced with it. `cloud_up` takes `port_offset` and `name`, and refuses a running compose project this server did not configure. `cloud_attach` takes those and `https_port` and only checks that the stack answers and that the named compose project owns its URL, so it also picks up a stack some other run started, an e2e run's for example, and it brings the tools back after a server restart. `cloud_up` and `cloud_attach` print the URL, `cloud_status` shows it later. `cloud_login` uses that URL when given none. `cloud_download` can answer a project plugin's permission prompt, and `cloud_synchronize` reports how many deltas went up and their status.
 - `cloud_user`, `cloud_create_project`, `cloud_add_collaborator`, `cloud_upload`, `cloud_package`, `cloud_deltas`: set up users and projects on the cloud `cloud_up` started, and read the deltas a project received. They act as the admin unless given `username` and `password`. A login ends the same user's other sessions, so give each device a user of its own.
 
 Calls to one device run one at a time. Devices stop when the server exits, and a server that was killed has its devices stopped by the next server start.
