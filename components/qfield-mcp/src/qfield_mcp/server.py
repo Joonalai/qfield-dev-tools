@@ -580,13 +580,21 @@ def cloud_login(
 
 @tool
 def cloud_download(
-    project_id: str, *, device: str = "device", open_it: bool = True
+    project_id: str,
+    *,
+    device: str = "device",
+    open_it: bool = True,
+    grant_project_plugin: bool = False,
 ) -> str:
-    """Download a cloud project the device's user can see, and open it."""
+    """Download a cloud project the device's user can see, and open it.
+
+    :param grant_project_plugin: Answer the project plugin permission prompt
+        while opening
+    """
     with devices.use(device) as app:
         path = actions.download_project(app, project_id)
         if open_it:
-            actions.open_project(app, path)
+            actions.open_project(app, path, grant_plugin=grant_project_plugin)
     return str(path)
 
 
