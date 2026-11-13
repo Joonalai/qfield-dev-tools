@@ -61,6 +61,7 @@ lint.external = ["QGS"]
     "PLR2004", # magic-value-comparison
     "N802", # Function name should be lowercase
     "E501", # Line too long
+    "INP001", # test directories don't need to be packages
     "FBT003", # QML-facing APIs take positional booleans
     "S101", # assert
     "SLF001", # private-member-access

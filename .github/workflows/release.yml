@@ -31,6 +31,12 @@ jobs:
       - name: Install uv
         uses: astral-sh/setup-uv@v6
 
+      - name: Release qfield-fetch
+        uses: ./.github/actions/release-component
+        with:
+          component: qfield-fetch
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+
       - name: Release pytest-qfield
         uses: ./.github/actions/release-component
         with:
