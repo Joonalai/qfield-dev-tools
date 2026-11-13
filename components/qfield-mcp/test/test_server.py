@@ -191,11 +191,7 @@ def test_set_field_and_save_form_use_the_form_of_a_new_feature(
     project_device: str,
 ) -> None:
     call("frame_map", x=NEW_POINT[0], y=NEW_POINT[1], device=project_device)
-    call(
-        "eval_js",
-        code="find('dashBoard').activeLayer = qgisProject.mapLayersByName('points')[0];",
-        device=project_device,
-    )
+    call("set_active_layer", layer=POINTS, device=project_device)
     call(
         "eval_js",
         code="iface.mainWindow().changeMode('digitize');",
@@ -217,6 +213,62 @@ def test_set_field_and_save_form_use_the_form_of_a_new_feature(
         code="iface.mainWindow().changeMode('browse');",
         device=project_device,
     )
+
+
+@pytest.mark.qfield_app
+def test_features_are_added_changed_and_deleted(project_device: str) -> None:
+    before = len(texts(project_device))
+    call("frame_map", x=NEW_POINT[0], y=NEW_POINT[1], device=project_device)
+
+    call(
+        "digitize_point",
+        layer=POINTS,
+        x=NEW_POINT[0],
+        y=NEW_POINT[1],
+        label="text_field",
+        value="tapped",
+        device=project_device,
+    )
+    call(
+        "add_feature",
+        layer=POINTS,
+        attributes={"text_field": "coded"},
+        wkt="Point (385020 6672000)",
+        device=project_device,
+    )
+    call(
+        "change_geometry",
+        layer=POINTS,
+        expression="text_field = 'coded'",
+        wkt="Point (385030 6672000)",
+        device=project_device,
+    )
+
+    assert len(texts(project_device)) == before + 2
+    geometries = call(
+        "eval_js",
+        device=project_device,
+        code="""
+      const layer = qgisProject.mapLayersByName('points')[0];
+      const it = LayerUtils.createFeatureIteratorFromExpression(layer, "text_field = 'coded'");
+      const wkt = String(it.next().geometry.asWkt(0)); it.close(); return {wkt};""",
+    )
+    assert geometries == {"wkt": "Point (385030 6672000)"}
+
+    call(
+        "delete_feature",
+        layer=POINTS,
+        expression="text_field = 'coded'",
+        device=project_device,
+    )
+    call(
+        "delete_feature",
+        layer=POINTS,
+        expression="text_field = 'tapped'",
+        device=project_device,
+    )
+
+    assert len(texts(project_device)) == before
 
 
 def test_cloud_download_passes_the_plugin_grant_on(
