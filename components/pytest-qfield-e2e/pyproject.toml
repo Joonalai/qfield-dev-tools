@@ -18,6 +18,7 @@ classifiers = [
 dependencies = [
     "pytest>=8",
     "qfield-driver",
+    "qfield-fetch",
 ]
 
 [project.optional-dependencies]
@@ -33,6 +34,7 @@ pytest-qfield-e2e-cloud = "pytest_qfield_e2e.cloud"
 
 [tool.uv.sources]
 qfield-driver = { workspace = true }
+qfield-fetch = { workspace = true }
 
 [build-system]
 requires = ["uv_build>=0.10.9,<0.14.0"]

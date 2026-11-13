@@ -30,8 +30,9 @@ from typing import TYPE_CHECKING
 
 import pytest
 
-from qfield_driver.app import DriverError, QFieldApp
-from qfield_driver.appimage import CACHE_ENV, default_cache_dir, ensure_appimage
+from qfield_driver.app import BINARY_ENV, DriverError, QFieldApp, local_app
+from qfield_fetch import appimage, release_version
+from qfield_fetch.pytest_plugin import configured_version
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Generator, Iterator
@@ -39,20 +40,20 @@ if TYPE_CHECKING:
 LOGGER = logging.getLogger(__name__)
 APPS_KEY = pytest.StashKey[list[tuple[str, QFieldApp, Path]]]()
 DEFAULT_VERSION = "4.2.9"
-VERSION_ENV = "QFIELD_APP_VERSION"
 
 
 def pytest_addoption(parser: pytest.Parser) -> None:
     group = parser.getgroup("qfield-app")
     group.addoption(
-        "--qfield-app-version",
-        help=f"QField release to run, `latest` for the newest. Env {VERSION_ENV}.",
+        "--qfield-app-binary",
+        help=(
+            "QField of your own to run instead of a fetched release: an AppRun,"
+            f" an AppImage or a build. Env {BINARY_ENV}."
+        ),
     )
     parser.addini(
-        "qfield_app_version",
-        f"QField release to run, `latest` for the newest. Default {DEFAULT_VERSION}.",
+        "qfield_app_binary", "QField to run, relative to the rootdir, see above."
     )
-    parser.addini("qfield_app_cache_dir", "Where QField AppImages are kept.")
     group.addoption(
         "--qfield-app-reuse",
         action="store_true",
@@ -89,34 +90,27 @@ def pytest_runtest_makereport(
     return report
 
 
-def cache_dir(config: pytest.Config) -> Path:
-    """Where AppImages and QFieldCloud checkouts are kept."""
-    configured = os.environ.get(CACHE_ENV) or config.getini("qfield_app_cache_dir")
-    if configured:
-        return config.rootpath / Path(configured).expanduser()
-    return default_cache_dir()
-
-
 @pytest.fixture(scope="session")
 def qfield_app_version(pytestconfig: pytest.Config) -> str:
-    """Return the QField release under test."""
-    return str(
-        pytestconfig.getoption("qfield_app_version")
-        or os.environ.get(VERSION_ENV)
-        or pytestconfig.getini("qfield_app_version")
-        or DEFAULT_VERSION
-    )
+    """Return the QField release under test, `latest` resolved."""
+    return release_version(configured_version(pytestconfig) or DEFAULT_VERSION)
 
 
 @pytest.fixture(scope="session")
-def qfield_app_cache_dir(pytestconfig: pytest.Config) -> Path:
-    return cache_dir(pytestconfig)
-
-
-@pytest.fixture(scope="session")
-def qfield_app_binary(qfield_app_version: str, qfield_app_cache_dir: Path) -> Path:
-    """`AppRun` of the extracted QField AppImage."""
-    return ensure_appimage(qfield_app_version, qfield_app_cache_dir)
+def qfield_app_binary(
+    request: pytest.FixtureRequest,
+    pytestconfig: pytest.Config,
+    qfield_fetch_cache_dir: Path,
+) -> Path:
+    """Return the configured QField, or the `AppRun` of the fetched release."""
+    if configured := pytestconfig.getoption("qfield_app_binary") or os.environ.get(
+        BINARY_ENV
+    ):
+        return local_app(configured)
+    if configured := pytestconfig.getini("qfield_app_binary"):
+        return local_app(pytestconfig.rootpath / configured)
+    version = request.getfixturevalue("qfield_app_version")
+    return appimage(version, qfield_fetch_cache_dir)
 
 
 @pytest.fixture
@@ -204,6 +198,10 @@ def qfield_app_factory(
             name: str = "device",
             app_plugins: dict[str, Path] | None = None,
         ) -> QFieldApp:
+            # Two running apps on one profile overwrite each other's files.
+            if any(name == other and app.running for other, app, _dir in started):
+                msg = f"Device {name!r} is already running in this test"
+                raise ValueError(msg)
             plugins = qfield_app_plugins if app_plugins is None else app_plugins
 
             def new(home: Path) -> QFieldApp:
@@ -212,6 +210,8 @@ def qfield_app_factory(
                     home,
                     app_plugins=plugins,
                     settings=qfield_app_settings,
+                    # Fixtures run on the main thread, which pytest keeps.
+                    die_with_parent=True,
                 )
                 return app.__enter__()
 

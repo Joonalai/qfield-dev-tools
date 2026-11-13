@@ -787,6 +787,7 @@ source = { editable = "components/pytest-qfield-e2e" }
 dependencies = [
     { name = "pytest" },
     { name = "qfield-driver" },
+    { name = "qfield-fetch" },
 ]
 
 [package.optional-dependencies]
@@ -799,6 +800,7 @@ requires-dist = [
     { name = "pytest", specifier = ">=8" },
     { name = "qfield-driver", editable = "components/qfield-driver" },
     { name = "qfield-driver", extras = ["cloud"], marker = "extra == 'cloud'", editable = "components/qfield-driver" },
+    { name = "qfield-fetch", editable = "components/qfield-fetch" },
 ]
 provides-extras = ["cloud"]
 
@@ -881,18 +883,22 @@ version = "0.0.0"
 source = { editable = "components/qfield-driver" }
 dependencies = [
     { name = "python-xlib" },
+    { name = "qfield-fetch" },
 ]
 
 [package.optional-dependencies]
 cloud = [
     { name = "requests" },
+    { name = "typer" },
     { name = "urllib3" },
 ]
 
 [package.metadata]
 requires-dist = [
     { name = "python-xlib", specifier = ">=0.33" },
+    { name = "qfield-fetch", editable = "components/qfield-fetch" },
     { name = "requests", marker = "extra == 'cloud'", specifier = ">=2.32" },
+    { name = "typer", marker = "extra == 'cloud'", specifier = ">=0.16" },
     { name = "urllib3", marker = "extra == 'cloud'", specifier = ">=2" },
 ]
 provides-extras = ["cloud"]
