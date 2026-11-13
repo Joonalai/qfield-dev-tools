@@ -15,7 +15,7 @@ Status: experimental. Linux x64 only.
 - QField AppImages are downloaded and extracted once by [qfield-fetch](https://github.com/Joonalai/qfield-dev-tools/tree/main/components/qfield-fetch).
 - QField runs on a private Xvfb with an isolated `HOME`, so it never touches your
   own QField profile or running instances. Cameras, when the machine has any, are
-  hidden with a mount namespace (`unshare`). Telemetry is off.
+  hidden with a mount namespace (`unshare`). Telemetry and the intro popups are off.
 - A small app plugin, the driver, is installed into that profile. It polls a localhost
   bridge (random token in the path) and runs JS function bodies sent from Python.
   Results come back JSON-decoded.

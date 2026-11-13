@@ -124,7 +124,7 @@ def seed_profile(
 ) -> None:
     """Install the driver and app plugins, and write QField settings.
 
-    Telemetry is turned off as well.
+    Telemetry and the first run intros are turned off as well.
 
     :param settings: QSettings keys such as `myplugin/interval`, a key without
         a group goes under `General`
@@ -136,7 +136,10 @@ def seed_profile(
         plugins += _plugin_settings(install_app_plugin(home, source, uuid), uuid)
     groups: dict[str, list[str]] = {
         "General": ["enableInfoCollection=false"],
-        "QField": ["showMapCanvasGuide=false"],
+        # QField 4.2.9 reads `showDashboardGuide` (qgismobileapp.qml), while its
+        # `blockGuides()` writes the misspelled `showDashBoardGuide`, so the
+        # spelling here must not be "fixed" to match.
+        "QField": ["showMapCanvasGuide=false", "showDashboardGuide=false"],
         "qfield": plugins.splitlines(),
     }
     for key, value in (settings or {}).items():
