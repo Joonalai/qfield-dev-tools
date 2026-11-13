@@ -28,6 +28,7 @@ from qfield_driver.app import DriverError, QFieldApp
 pytestmark = pytest.mark.qfield_app
 
 POINTS = "points"
+NEW_POINT = (385000.0, 6672000.0)
 
 
 def test_eval_returns_json_values(qfield_app: QFieldApp) -> None:
@@ -167,6 +168,56 @@ def test_add_feature_and_change_geometry(
     assert actions.geometries(qfield_app, POINTS, "text_field = 'added'") == [
         "Point (385010 6672000)"
     ]
+
+
+def test_digitize_point_adds_a_feature(
+    qfield_app: QFieldApp, project_file: Path
+) -> None:
+    actions.open_project(qfield_app, project_file)
+    before = actions.feature_count(qfield_app, POINTS)
+    actions.frame_map(qfield_app, *NEW_POINT, 100)
+
+    actions.digitize_point(qfield_app, POINTS, NEW_POINT, "text_field", "digitized")
+
+    assert actions.feature_count(qfield_app, POINTS) == before + 1
+    assert actions.feature_count(qfield_app, POINTS, "text_field = 'digitized'") == 1
+
+
+def test_form_of_a_new_feature_is_found_and_saved(
+    qfield_app: QFieldApp, project_file: Path
+) -> None:
+    actions.open_project(qfield_app, project_file)
+    before = actions.feature_count(qfield_app, POINTS)
+    actions.frame_map(qfield_app, *NEW_POINT, 100)
+    actions.set_active_layer(qfield_app, POINTS)
+    qfield_app.eval("iface.mainWindow().changeMode('digitize');")
+    qfield_app.wait("return find('stateMachine').state === 'digitize'", 10)
+    actions.tap_map(qfield_app, *NEW_POINT)
+    qfield_app.wait("return find('overlayFeatureFormDrawer').opened", 15)
+
+    assert actions.current_form(qfield_app) == actions.OVERLAY_FORM
+    actions.set_field(
+        qfield_app, "text_field", "overlay", actions.current_form(qfield_app)
+    )
+    actions.save_open_form(qfield_app)
+
+    assert actions.feature_count(qfield_app, POINTS, "text_field = 'overlay'") == 1
+    assert actions.feature_count(qfield_app, POINTS) == before + 1
+
+
+def test_open_form_finds_the_form_of_an_existing_feature(
+    qfield_app: QFieldApp, project_file: Path
+) -> None:
+    actions.open_project(qfield_app, project_file)
+    actions.open_feature_form(qfield_app, POINTS, "text_field = 'test'")
+
+    assert actions.current_form(qfield_app) == actions.FEATURE_FORM
+    actions.set_field(
+        qfield_app, "text_field", "edited", actions.current_form(qfield_app)
+    )
+    actions.save_open_form(qfield_app)
+
+    assert actions.feature_count(qfield_app, POINTS, "text_field = 'edited'") == 1
 
 
 def test_delete_feature_through_the_form_menu(
