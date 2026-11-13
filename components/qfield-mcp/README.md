@@ -41,7 +41,7 @@ apply when a tool call names no version or ref:
 
 | Variable | What |
 | --- | --- |
-| `QFIELD_APP_BINARY` | An AppRun, an AppImage or a build of your own instead of release 4.2.9 |
+| `QFIELD_APP_BINARY` | An AppRun, an AppImage or a build of your own instead of release 4.2.9. `start_device` fails naming it when the path is not executable, pass `version` or unset it |
 | `QFIELDCLOUD_SOURCE_DIR` | A QFieldCloud checkout of your own for `cloud_up` instead of the hosted release |
 
 ```bash
@@ -55,10 +55,13 @@ claude mcp add qfield -e QFIELD_APP_BINARY=/path/to/AppRun -- uvx qfield-mcp
 - `wait_for`: until a JS body is truthy, or a text appears or disappears.
 - `tap`, `tap_map`, `frame_map`, `type_text`, `key`: real input events.
 - `screenshot`: the window or one item as PNG, optionally scaled down. Refused while a camera view is open.
-- `eval_js`: a JS function body run inside QField.
+- `eval_js`: a JS function body run inside QField. Its description lists where QML differs from PyQGIS.
 - `messages`, `log`: QField's message log and process output.
-- `open_project`, `set_position`, `features`, `open_feature_form`, `set_field`, `save_form`, `close_feature_form`.
-- `cloud_up`, `cloud_login`, `cloud_download`, `cloud_synchronize`: a local QFieldCloud and devices synced with it.
+- `open_project`, `set_position`, `features`: open a project, feed a GNSS fix, read attributes.
+- `open_feature_form`, `set_field`, `save_form`, `close_feature_form`: edit through the real form. `set_field` and `save_form` use whichever form is open, an existing feature's or a new one's.
+- `set_active_layer`, `digitize_point`, `add_feature`, `change_geometry`, `delete_feature`: add a point by tapping the map, add one in code, move one and delete one through its form menu.
+- `cloud_up`, `cloud_login`, `cloud_download`, `cloud_synchronize`: a local QFieldCloud and devices synced with it. `cloud_download` can answer a project plugin's permission prompt, and `cloud_synchronize` reports how many deltas went up and their status.
+- `cloud_user`, `cloud_create_project`, `cloud_add_collaborator`, `cloud_upload`, `cloud_package`, `cloud_deltas`: set up users and projects on the cloud `cloud_up` started, and read the deltas a project received. They act as the admin unless given `username` and `password`. A login ends the same user's other sessions, so give each device a user of its own.
 
 Calls to one device run one at a time. Devices stop when the server exits, and a server that was killed has its devices stopped by the next server start.
 
