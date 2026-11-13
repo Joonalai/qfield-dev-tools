@@ -1,7 +1,7 @@
 # qfield-fetch
 
 Downloads QField release AppImages, and QField and QFieldCloud sources, into one cache.
-[pytest-qfield](https://github.com/Joonalai/qfield-dev-tools/tree/main/components/pytest-qfield) and [pytest-qfield-e2e](https://github.com/Joonalai/qfield-dev-tools/tree/main/components/pytest-qfield-e2e)
+[pytest-qfield](https://github.com/Joonalai/qfield-dev-tools/tree/main/components/pytest-qfield) and [qfield-driver](https://github.com/Joonalai/qfield-dev-tools/tree/main/components/qfield-driver)
 fetch through it, and the command line manages the same cache.
 
 Each entry is fetched once, even by parallel processes such as pytest-xdist workers.

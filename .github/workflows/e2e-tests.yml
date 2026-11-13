@@ -6,6 +6,7 @@ on:
     paths:
       - 'components/qfield-driver/**'
       - 'components/pytest-qfield-e2e/**'
+      - 'components/qfield-fetch/**'
       - 'components/pytest-qfield/test/data/**'
       - '.github/workflows/e2e-tests.yml'
       - 'uv.lock'
@@ -14,6 +15,7 @@ on:
     paths:
       - 'components/qfield-driver/**'
       - 'components/pytest-qfield-e2e/**'
+      - 'components/qfield-fetch/**'
       - 'components/pytest-qfield/test/data/**'
       - '.github/workflows/e2e-tests.yml'
       - 'uv.lock'
@@ -49,14 +51,14 @@ jobs:
           sudo apt-get install -y $APP_PACKAGES
       - uses: actions/cache@v4
         with:
-          path: ~/.cache/pytest-qfield-e2e
+          path: ~/.cache/qfield-fetch/appimage
           key: qfield-${{ matrix.qfield-version }}-${{ github.run_id }}
           restore-keys: qfield-${{ matrix.qfield-version }}-
       - name: Run driver tests
         run: uv run --package qfield-driver --all-extras --all-groups pytest -v components/qfield-driver/test
       - name: Run e2e tests
         env:
-          QFIELD_APP_VERSION: ${{ matrix.qfield-version }}
+          QFIELD_VERSION: ${{ matrix.qfield-version }}
         run: uv run --package pytest-qfield-e2e --all-extras --all-groups pytest -v -m "not qfieldcloud" components/pytest-qfield-e2e/test
 
   cloud:

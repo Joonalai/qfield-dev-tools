@@ -32,12 +32,24 @@ import os
 import re
 import shutil
 import socket
+import ssl
 import subprocess
 import time
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 from urllib.request import Request, urlopen
+
+from qfield_fetch import (
+    LATEST,
+    QFIELDCLOUD,
+    Kind,
+    entries,
+    entry_path,
+    latest_release,
+    qfieldcloud_source,
+    remove,
+)
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -45,11 +57,9 @@ if TYPE_CHECKING:
 LOGGER = logging.getLogger(__name__)
 
 HERE = Path(__file__).parent
-REPOSITORY = "https://github.com/opengisch/QFieldCloud.git"
 HOSTED_STATUS = "https://app.qfield.cloud/api/v1/status/"
-LATEST_API = "https://api.github.com/repos/opengisch/QFieldCloud/releases/latest"
 HOSTED = "hosted"
-LATEST = "latest"
+SOURCE_ENV = "QFIELDCLOUD_SOURCE_DIR"
 OVERRIDE = "docker-compose.override.pytest.yml"
 # Generated per release, services differ between releases.
 SERVICES_OVERRIDE = "docker-compose.override.pytest-services.yml"
@@ -78,16 +88,12 @@ def hosted_ref() -> str:
     return version.split("-", maxsplit=1)[0]
 
 
-def latest_ref() -> str:
-    return str(_get_json(LATEST_API)["tag_name"])
-
-
 def resolve_ref(ref: str) -> str:
     """Resolve a tag or branch from `hosted`, `latest` or an explicit ref."""
     if ref == HOSTED:
         return hosted_ref()
     if ref == LATEST:
-        return latest_ref()
+        return latest_release(QFIELDCLOUD)
     return ref
 
 
@@ -130,6 +136,11 @@ def render_env(example: str, overrides: dict[str, str]) -> str:
     return "\n".join(lines) + "\n"
 
 
+def local_ref(source: Path) -> str:
+    """Name a checkout of your own as a ref, `local-QFieldCloud` for example."""
+    return f"local-{source.name}"
+
+
 def compose_project_name(ref: str) -> str:
     return PROJECT_PREFIX + re.sub(r"[^a-z0-9]+", "_", ref.lower()).strip("_")
 
@@ -138,10 +149,12 @@ def compose_project_name(ref: str) -> str:
 class QFieldCloudStack:
     """One local QFieldCloud.
 
-    Ports are host ports, published on all interfaces like upstream does.
+    Ports are host ports bound to localhost. Only the object storage API also
+    listens on `storage_host`, where the containers reach it.
     """
 
     ref: str
+    # The qfield-fetch cache, which holds the checkout.
     cache_dir: Path
     https_port: int = 8543
     http_port: int = 8180
@@ -154,6 +167,22 @@ class QFieldCloudStack:
     extra_env: dict[str, str] = field(default_factory=dict)
     # Compose project, derived from the ref unless given.
     name: str | None = None
+    # A QFieldCloud checkout of your own, used instead of a fetched one.
+    source: Path | None = None
+    # Set by `prepare_source`, a running stack then restarts what changed.
+    reconfigured: bool = field(default=False, init=False)
+
+    @classmethod
+    def local(cls, source: Path, cache_dir: Path) -> QFieldCloudStack:
+        """Return a stack running from a QFieldCloud checkout of your own.
+
+        The stack writes its `.env` and compose overrides into the checkout.
+        """
+        source = source.expanduser().resolve()
+        if not (source / ".env.example").is_file():
+            msg = f"Not a QFieldCloud checkout: {source}"
+            raise FileNotFoundError(msg)
+        return cls(local_ref(source), cache_dir, source=source)
 
     @property
     def url(self) -> str:
@@ -165,7 +194,8 @@ class QFieldCloudStack:
 
     @property
     def source_dir(self) -> Path:
-        return self.cache_dir / f"QFieldCloud-{self.ref}"
+        """The checkout the stack runs from."""
+        return self.source or entry_path(Kind.QFIELDCLOUD, self.ref, self.cache_dir)
 
     @property
     def ca_certificate(self) -> Path:
@@ -193,18 +223,13 @@ class QFieldCloudStack:
         }
 
     def prepare_source(self) -> Path:
-        source = self.source_dir
-        if not source.exists():
-            self.cache_dir.mkdir(parents=True, exist_ok=True)
-            subprocess.run(
-                [
-                    *("git", "clone", "--quiet", "--depth=1"),
-                    f"--branch={self.ref}",
-                    REPOSITORY,
-                    str(source),
-                ],
-                check=True,
-            )
+        """Fetch the release and write its configuration.
+
+        Sets `reconfigured` when the configuration changed, the storage host
+        follows the network for example.
+        """
+        source = self.source or qfieldcloud_source(self.ref, self.cache_dir)
+        before = self._configuration(source)
         shutil.copy(HERE / OVERRIDE, source / OVERRIDE)
         shutil.copy(HERE / RESOLVER_SCRIPT, source / RESOLVER_SCRIPT)
         env = render_env((source / ".env.example").read_text(), self.env_overrides())
@@ -217,12 +242,30 @@ class QFieldCloudStack:
         )
         (source / ".env").write_text(env)
         (source / SERVICES_OVERRIDE).write_text(self._services_override())
+        self.reconfigured = self._configuration(source) != before
         return source
+
+    @staticmethod
+    def _configuration(source: Path) -> list[str | None]:
+        return [
+            path.read_text() if path.exists() else None
+            for path in (source / ".env", source / SERVICES_OVERRIDE)
+        ]
+
+    def _bind(self, port: dict[str, Any]) -> str:
+        host = (
+            self.storage_host
+            if str(port["published"]) == str(self.storage_api_port)
+            else "127.0.0.1"
+        )
+        protocol = port.get("protocol", "tcp")
+        return f'"{host}:{port["published"]}:{port["target"]}/{protocol}"'
 
     def _services_override(self) -> str:
         """Override the upstream compose services for the tests.
 
-        Drops log options podman rejects, and disables unneeded services.
+        Drops log options podman rejects, disables unneeded services and binds
+        the ports to localhost, upstream publishes them on all interfaces.
         """
         upstream = [f"--file={name}" for name in UPSTREAM_FILES]
         completed = self.compose(
@@ -235,6 +278,10 @@ class QFieldCloudStack:
                 lines.append("    profiles: [disabled]")
             if "logging" in spec:
                 lines += ["    logging: !override", "      driver: json-file"]
+            ports = [port for port in spec.get("ports", []) if port.get("published")]
+            if ports:
+                lines.append("    ports: !override")
+                lines += [f"      - {self._bind(port)}" for port in ports]
             if lines[-1] == f"  {name}:":
                 lines.pop()
         return "\n".join(lines) + "\n"
@@ -263,21 +310,16 @@ class QFieldCloudStack:
         ).stdout
 
     def is_up(self) -> bool:
-        # The cloud extra provides these, the fixtures load without it.
-        import requests  # noqa: PLC0415
-        import urllib3  # noqa: PLC0415
-
-        urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
-
-        try:
-            response = requests.get(
-                f"{self.url}/api/v1/status/",
-                verify=False,  # noqa: S501 the local stack has a self-signed certificate
-                timeout=5,
-            )
-        except requests.RequestException:
+        # Without its own certificate authority, nothing of this stack answers.
+        if not self.ca_certificate.exists():
             return False
-        return response.ok and response.json().get("database") == "ok"
+        context = ssl.create_default_context(cafile=self.ca_certificate)
+        url = f"{self.url}/api/v1/status/"
+        try:
+            with urlopen(url, timeout=5, context=context) as response:  # noqa: S310 the stack's https URL
+                return json.load(response).get("database") == "ok"
+        except (OSError, ValueError):
+            return False
 
     def _runs_here(self) -> bool:
         """Whether this ref's own app container is running."""
@@ -322,7 +364,7 @@ class QFieldCloudStack:
         Idempotent, and safe from parallel processes such as pytest-xdist workers.
         """
         self.cache_dir.mkdir(parents=True, exist_ok=True)
-        with (self.cache_dir / f"{self.project_name}.lock").open("w") as lock:
+        with (self.cache_dir / f".{self.project_name}.lock").open("w") as lock:
             fcntl.flock(lock, fcntl.LOCK_EX)
             self._up()
 
@@ -335,11 +377,11 @@ class QFieldCloudStack:
                 "Building QFieldCloud %s %s, this takes a while", self.ref, missing
             )
             self.compose("--profile", "*", "build", *missing)
-        elif self.is_up():
+        elif self.is_up() and not self.reconfigured:
             if not self._runs_here():
                 msg = (
                     f"Another QFieldCloud answers on port {self.https_port}, stop it"
-                    " with `python -m qfield_driver.cloud prune` or pick other"
+                    " with `qfield-driver-cloud prune` or pick other"
                     " ports"
                 )
                 raise StackError(msg)
@@ -387,7 +429,6 @@ class QFieldCloudStack:
             f"--email={username}@localhost.local",
             f"--password={password}",
             *(["--superuser"] if superuser else []),
-            check=False,
         )
 
     def logs(self, *services: str, tail: int = 200) -> str:
@@ -402,11 +443,10 @@ class QFieldCloudStack:
 def down_stale(cache_dir: Path, keep: str) -> list[str]:
     """Remove stacks of other refs, and return the refs removed."""
     removed = []
-    for source in sorted(cache_dir.glob("QFieldCloud-*")):
-        ref = source.name.removeprefix("QFieldCloud-")
-        if ref == keep:
+    for entry in entries(cache_dir):
+        if entry.kind != Kind.QFIELDCLOUD or entry.name == keep:
             continue
-        QFieldCloudStack(ref, cache_dir).down()
-        shutil.rmtree(source, ignore_errors=True)
-        removed.append(ref)
+        QFieldCloudStack(entry.name, cache_dir).down()
+        remove(Kind.QFIELDCLOUD, entry.name, cache_dir)
+        removed.append(entry.name)
     return removed

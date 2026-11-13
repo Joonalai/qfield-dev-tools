@@ -46,6 +46,7 @@ DRIVER_NAME = "qfield_driver"
 DRIVER_SOURCE = Path(__file__).parent / "driver" / DRIVER_NAME
 PLUGINS_DIR = "Documents/QField Documents/QField/plugins"
 SCREEN_SIZE = (1280, 800)
+BINARY_ENV = "QFIELD_APP_BINARY"
 START_TIMEOUT_S = 90
 POLL_S = 0.02
 # QField opens the host's webcam for a photo, so hide every camera from it.
@@ -73,6 +74,15 @@ DROPPED_ENV = (
 
 class DriverError(RuntimeError):
     """Code sent to QField threw, or QField went away."""
+
+
+def local_app(path: str | Path) -> Path:
+    """Return a QField of your own to run: an AppRun, an AppImage or a build."""
+    app_run = Path(path).expanduser().resolve()
+    if not app_run.is_file() or not os.access(app_run, os.X_OK):
+        msg = f"Not an executable QField: {app_run}"
+        raise FileNotFoundError(msg)
+    return app_run
 
 
 def settings_key(main_qml: Path) -> str:

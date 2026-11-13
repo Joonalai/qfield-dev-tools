@@ -21,10 +21,10 @@ from pathlib import Path
 import pytest
 
 from pytest_qfield_e2e.cloud import worker_username
-from pytest_qfield_e2e.plugin import VERSION_ENV
 from qfield_driver import actions
-from qfield_driver.app import QFieldApp
-from qfield_driver.appimage import CACHE_ENV
+from qfield_driver.app import BINARY_ENV, QFieldApp, local_app
+from qfield_fetch import CACHE_ENV
+from qfield_fetch.pytest_plugin import VERSION_ENV
 
 pytest_plugins = ["pytester"]
 pytestmark = pytest.mark.qfield_app
@@ -36,11 +36,11 @@ INNER_ARGS = ("-p", "no:pytest-qfield", "-p", "no:pytest_qgis", "-p", "no:pytest
 def inner_pytester(
     pytester: pytest.Pytester,
     monkeypatch: pytest.MonkeyPatch,
-    qfield_app_cache_dir: Path,
+    qfield_fetch_cache_dir: Path,
     qfield_app_version: str,
 ) -> pytest.Pytester:
     """Pytester whose runs use the outer QField, its HOME has no cache."""
-    monkeypatch.setenv(CACHE_ENV, str(qfield_app_cache_dir))
+    monkeypatch.setenv(CACHE_ENV, str(qfield_fetch_cache_dir))
     monkeypatch.setenv(VERSION_ENV, qfield_app_version)
     return pytester
 
@@ -129,3 +129,28 @@ def test_worker_usernames(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("PYTEST_XDIST_WORKER", "gw1")
     assert worker_username("alice") == "alice_gw1"
     assert worker_username("alice_gw1") == "alice_gw1"
+
+
+def test_own_binary_is_used_instead_of_a_release(
+    pytester: pytest.Pytester, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    binary = tmp_path / "qfield"
+    binary.write_text("#!/bin/sh\n")
+    binary.chmod(0o755)
+    monkeypatch.setenv(BINARY_ENV, str(binary))
+    pytester.makepyfile("""
+        def test_binary(qfield_app_binary):
+            print("binary", qfield_app_binary)
+    """)
+
+    result = pytester.runpytest_subprocess(*INNER_ARGS, "-s")
+
+    result.assert_outcomes(passed=1)
+    result.stdout.fnmatch_lines([f"*binary {binary}"])
+
+
+def test_own_binary_must_be_executable(tmp_path: Path) -> None:
+    (tmp_path / "qfield").write_text("")
+
+    with pytest.raises(FileNotFoundError, match="Not an executable QField"):
+        local_app(tmp_path / "qfield")

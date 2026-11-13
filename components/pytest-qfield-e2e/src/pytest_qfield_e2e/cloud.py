@@ -29,7 +29,13 @@ from typing import TYPE_CHECKING, Any
 import pytest
 
 from qfield_driver import actions
-from qfield_driver.cloud.stack import HOSTED, QFieldCloudStack, resolve_ref
+from qfield_driver.cloud.stack import (
+    HOSTED,
+    SOURCE_ENV,
+    QFieldCloudStack,
+    local_ref,
+    resolve_ref,
+)
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Generator, Iterator
@@ -58,6 +64,13 @@ def pytest_addoption(parser: pytest.Parser) -> None:
         help="Remove the QFieldCloud stack and its data after the session.",
     )
     parser.addini("qfieldcloud_ref", "QFieldCloud release, see --qfieldcloud-ref.")
+    group.addoption(
+        "--qfieldcloud-source-dir",
+        help=f"QFieldCloud checkout of your own to run. Env {SOURCE_ENV}.",
+    )
+    parser.addini(
+        "qfieldcloud_source_dir", "QFieldCloud checkout, relative to the rootdir."
+    )
     parser.addini("qfieldcloud_https_port", "Host HTTPS port, 8543 by default.")
 
 
@@ -84,7 +97,12 @@ def pytest_sessionfinish(session: pytest.Session) -> None:
     config = session.config
     used = config.stash.get(USED_STACK, None)
     if used and config.getoption("qfieldcloud_down") and not os.environ.get(WORKER_ENV):
-        QFieldCloudStack(used["ref"], Path(used["cache_dir"]), name=used["name"]).down()
+        QFieldCloudStack(
+            used["ref"],
+            Path(used["cache_dir"]),
+            name=used["name"],
+            source=Path(used["source"]) if used["source"] else None,
+        ).down()
 
 
 @pytest.hookimpl(optionalhook=True)
@@ -107,13 +125,30 @@ def pytest_fixture_setup(
             "ref": result.ref,
             "cache_dir": str(result.cache_dir),
             "name": result.name,
+            "source": str(result.source) if result.source else None,
         }
     return result
 
 
+def local_source(config: pytest.Config) -> Path | None:
+    """Return the configured QFieldCloud checkout of your own, if any."""
+    if configured := config.getoption("qfieldcloud_source_dir") or os.environ.get(
+        SOURCE_ENV
+    ):
+        return Path(configured)
+    if configured := config.getini("qfieldcloud_source_dir"):
+        return config.rootpath / configured
+    return None
+
+
 @pytest.fixture(scope="session")
 def qfieldcloud_ref(pytestconfig: pytest.Config) -> str:
-    """Return the QFieldCloud tag under test, resolved from `hosted` or `latest`."""
+    """Return the QFieldCloud tag under test, resolved from `hosted` or `latest`.
+
+    With a checkout of your own, `local-<directory>`.
+    """
+    if source := local_source(pytestconfig):
+        return local_ref(source.expanduser().resolve())
     ref = (
         pytestconfig.getoption("qfieldcloud_ref")
         or os.environ.get(REF_ENV)
@@ -125,14 +160,17 @@ def qfieldcloud_ref(pytestconfig: pytest.Config) -> str:
 
 @pytest.fixture(scope="session")
 def qfieldcloud_stack(
-    pytestconfig: pytest.Config, qfieldcloud_ref: str, qfield_app_cache_dir: Path
+    pytestconfig: pytest.Config, qfieldcloud_ref: str, qfield_fetch_cache_dir: Path
 ) -> Iterator[QFieldCloudStack]:
     """Start a local QFieldCloud, reused across sessions until removed.
 
     Workers of pytest-xdist share it. Override to change ports or pass extra
     `.env` values.
     """
-    stack = QFieldCloudStack(qfieldcloud_ref, qfield_app_cache_dir)
+    if source := local_source(pytestconfig):
+        stack = QFieldCloudStack.local(source, qfield_fetch_cache_dir)
+    else:
+        stack = QFieldCloudStack(qfieldcloud_ref, qfield_fetch_cache_dir)
     if port := pytestconfig.getini("qfieldcloud_https_port"):
         stack.https_port = int(port)
     stack.up()
@@ -151,7 +189,12 @@ def qfieldcloud_admin(qfieldcloud_stack: QFieldCloudStack) -> QFieldCloudClient:
         # A login ends the user's other sessions, so each worker has its own.
         username = worker_username(username)
         qfieldcloud_stack.ensure_user(username, password, superuser=True)
-    return QFieldCloudClient(qfieldcloud_stack.url, username, password)
+    return QFieldCloudClient(
+        qfieldcloud_stack.url,
+        username,
+        password,
+        verify=qfieldcloud_stack.ca_certificate,
+    )
 
 
 @pytest.fixture(scope="session")
@@ -167,7 +210,12 @@ def qfieldcloud_user(
     def user(username: str, password: str = DEFAULT_PASSWORD) -> QFieldCloudClient:
         username = worker_username(username)
         qfieldcloud_stack.ensure_user(username, password)
-        return QFieldCloudClient(qfieldcloud_stack.url, username, password)
+        return QFieldCloudClient(
+            qfieldcloud_stack.url,
+            username,
+            password,
+            verify=qfieldcloud_stack.ca_certificate,
+        )
 
     return user
 

@@ -182,3 +182,29 @@ def test_evaluate_expression(qfield_app: QFieldApp, project_file: Path) -> None:
 
     assert actions.evaluate_expression(qfield_app, "1 + 2") == "3"
     assert actions.evaluate_expression(qfield_app, "@layer_name", POINTS) == POINTS
+
+
+def test_files_load_from_paths_with_url_characters(
+    qfield_app: QFieldApp, tmp_path: Path
+) -> None:
+    directory = tmp_path / "a #1%"
+    directory.mkdir()
+    (directory / "main.qml").write_text(
+        "import QtQuick\nItem { property int answer: 42 }\n"
+    )
+    (directory / "lib.mjs").write_text("export function twice(x) { return 2 * x; }\n")
+
+    qfield_app.host_plugin(directory / "main.qml")
+    actions.import_js(qfield_app, directory / "lib.mjs", "lib")
+
+    assert qfield_app.plugin_property("answer") == 42
+    assert qfield_app.eval("return state.lib.call('twice', [2])") == 4
+
+
+def test_device_names_are_unique_within_a_test(
+    qfield_app_factory: Callable[..., QFieldApp],
+) -> None:
+    qfield_app_factory("phone")
+
+    with pytest.raises(ValueError, match="already running"):
+        qfield_app_factory("phone")

@@ -16,14 +16,22 @@ classifiers = [
 ]
 dependencies = [
     "python-xlib>=0.33",
+    "qfield-fetch",
 ]
 
 [project.optional-dependencies]
-cloud = ["requests>=2.32", "urllib3>=2"]
+cloud = ["requests>=2.32", "urllib3>=2", "typer>=0.16"]
 
 [project.urls]
 homepage = "https://github.com/Joonalai/qfield-dev-tools"
 repository = "https://github.com/Joonalai/qfield-dev-tools"
+
+[project.scripts]
+qfield-driver-cloud = "qfield_driver.cloud.cli:app"
+qfdc = "qfield_driver.cloud.cli:app"
+
+[tool.uv.sources]
+qfield-fetch = { workspace = true }
 
 [build-system]
 requires = ["uv_build>=0.10.9,<0.14.0"]
