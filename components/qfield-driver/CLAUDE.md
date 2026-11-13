@@ -19,6 +19,7 @@ Gotchas learned against QField 4.2.9 and 4.3.8:
 - Plugin QML errors go to QGIS' message log, not stdout. Read `messageLogModel` (newest first) or use `Qt.createComponent(path).errorString()`.
 - A project plugin waits on a permission prompt, `open_project(..., grant_plugin=True)` answers it. Without it QField runs silently without the plugin.
 - `iface.findItemByObjectName` misses plugin toolbar items and popups. The driver's `findItem` walks the scene and the hosted plugin's `data`, `children` and popup `contentItem`.
+- First run intros: QField 4.2.9 reads `/QField/showDashboardGuide`, but `toursController.blockGuides()` writes `showDashBoardGuide` (capital B), a different key. `seed_profile` writes the key QField reads, don't "fix" its spelling.
 - Field editor loaders are named by the field alias, `attributeEditorLoader<alias>`.
 - After typing in a ValueRelation search, wait about 1 s before tapping a row.
 - A NULL integer attribute reads as `0` in QField JS, stubs return `null`.
