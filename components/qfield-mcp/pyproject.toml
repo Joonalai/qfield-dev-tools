@@ -2,7 +2,7 @@
 name = "qfield-mcp"
 description = "MCP server driving a real QField app, for agents exploring and testing plugins"
 readme = "README.md"
-version = "0.1.1"
+version = "0.1.2"
 keywords = ["QField", "MCP", "GIS"]
 license = "GPL-2.0-or-later"
 license-files = ["LICENSE"]
