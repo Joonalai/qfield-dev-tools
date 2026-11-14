@@ -2,7 +2,7 @@
 name = "qfield-driver"
 description = "Drive a real QField app from Python, with a local QFieldCloud"
 readme = "README.md"
-version = "0.2.0"
+version = "0.3.0"
 keywords = ["QField", "QFieldCloud", "GIS", "e2e"]
 license = "GPL-2.0-or-later"
 license-files = ["LICENSE"]
