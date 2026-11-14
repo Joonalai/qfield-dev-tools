@@ -2,6 +2,14 @@
 
 <!-- version list -->
 
+## v0.2.1 (2026-11-14)
+
+### Build System
+
+- **deps**: Require qfield-driver >=0.3.0 in pytest-qfield-e2e
+  ([`52e8c1f`](https://github.com/Joonalai/qfield-dev-tools/commit/52e8c1f9a8c2e7d5aa018cbf307593f256728f11))
+
+
 ## v0.2.0 (2026-11-14)
 
 ### Build System
