@@ -2,9 +2,6 @@
 
 name: Release & publish
 on:
-  push:
-    branches:
-      - main
   workflow_dispatch:
     inputs:
       dry_run:
@@ -36,7 +33,7 @@ jobs:
         with:
           fetch-depth: 0
       - name: Release Python packages
-        uses: nlsfi/python-monorepo-release-action@v1.0.0
+        uses: nlsfi/python-monorepo-release-action@v1.0.1
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           dry_run: ${{ inputs.dry_run }}

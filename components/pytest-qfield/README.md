@@ -307,10 +307,6 @@ $ uv run --package pytest-qfield pytest components/pytest-qfield
 
 `uv lock --upgrade`
 
-### Release process
-
-Releases are made automatically upon push to main branch using Python Semantic Release.
-
 ## Contributing
 
 Contributions are very welcome.

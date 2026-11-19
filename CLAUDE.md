@@ -29,7 +29,8 @@ Each component releases on its own with python-semantic-release's `conventional-
 - A commit counts for a component when it changes files in the component's directory, or when its scope matches the component's `scope_prefix` (e.g. `feat(e2e): ...`).
 - Only `feat` (minor), `fix` and `build` (patch) commits release. Type root-only changes `chore:`/`ci:`/`docs:` so they release nothing.
 - Merge with rebase merge, not squash, so each commit keeps its own component.
-- `.github/workflows/release.yml` releases the components in dependency order. Add a step for each new component.
+- Releases run only when `.github/workflows/release.yml` is dispatched manually, not on push or merge. It defaults to `dry_run: true`. Never add a `push` trigger back.
+- The shared release action discovers components and orders them by their workspace dependencies, so a new component needs no workflow change.
 - `.github/actions/setup-pytest-qfield` and `setup-qfield-e2e` are used by other repositories, so treat their inputs as a public API. Our own workflows use them too.
 
 ## Running tests and hooks

@@ -146,15 +146,16 @@ Scopes tie a commit to a component even when it touches no files of it:
 - Only `feat` (minor), `fix` and `build` (patch) release. Use `chore`, `ci` or `docs` for root-only
   changes.
 - Merge pull requests with rebase merge, not squash, so each commit keeps its component.
-- `.github/workflows/release.yml` runs on `main` and uses
-  `nlsfi/python-monorepo-release-action@v1.0.0` to release workspace components in dependency order.
-  Components with a `[project].name` are discovered automatically; declare their workspace
-  dependencies in `pyproject.toml` so the action can determine their order. Manual dispatch defaults
-  to `dry_run: true`; disable it to publish.
+- Merging to `main` releases nothing. Release by running `.github/workflows/release.yml` from the
+  Actions tab (Run workflow) on `main`. It defaults to `dry_run: true`, which only builds the
+  packages; untick it to publish.
+- The workflow uses `nlsfi/python-monorepo-release-action@v1.0.0` to release workspace components
+  in dependency order. Components with a `[project].name` are discovered automatically; declare
+  their workspace dependencies in `pyproject.toml` so the action can determine their order.
 - Each release is published to PyPI right away with trusted publishing (environment `pypi`). A new
   package needs a pending publisher for `release.yml` first. PyPI consumes a matching pending
-  publisher on the run's first upload, whichever package it is, so add it right before merging the
-  pull request that first releases the package, and make sure that run releases nothing else.
+  publisher on the run's first upload, whichever package it is, so add it right before the run that
+  first releases the package, and make sure that run releases nothing else.
 - After a release, the shared action raises outdated dependent requirements, updates `uv.lock`, and
   commits them as `build(deps)`, which releases the dependents too.
 
@@ -166,7 +167,7 @@ Scopes tie a commit to a component even when it touches no files of it:
 | `e2e-tests.yml` | Driver, e2e and mcp tests against QField 4.2.9 and `latest`, also nightly |
 | `cloud-tests.yml` | Cloud tests against the hosted QFieldCloud release. On pull requests that change cloud code, nightly and on manual dispatch |
 | `prek.yml` | All hooks |
-| `release.yml` | Releases, see above |
+| `release.yml` | Releases on manual dispatch only, see above |
 
 The reusable actions are used by other repositories, so treat their inputs as a public API:
 
