@@ -39,6 +39,7 @@ from enum import StrEnum
 from functools import partial
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
+from urllib.parse import unquote
 from urllib.request import Request, urlopen
 
 if TYPE_CHECKING:
@@ -54,6 +55,8 @@ QFIELDCLOUD = "opengisch/QFieldCloud"
 LATEST = "latest"
 DOWNLOAD_CHUNK = 1 << 20
 VERSION_PATTERN = re.compile(r"v?(\d+\.\d+\.\d+[A-Za-z0-9.-]*)")
+# `latest` is never a pre-release, so cached ones cannot stand in for it.
+RELEASE_PATTERN = re.compile(r"(\d+)\.(\d+)\.(\d+)")
 # Refs name cache directories, so nothing that could leave the cache.
 REF_PATTERN = re.compile(r"[A-Za-z0-9][A-Za-z0-9._/-]*")
 
@@ -96,7 +99,26 @@ def _github_api(path: str) -> dict[str, Any]:
 
 def latest_release(repository: str) -> str:
     """Return the tag of the newest release, `v4.2.9` for example."""
-    return str(_github_api(f"/repos/{repository}/releases/latest")["tag_name"])
+    try:
+        return str(_github_api(f"/repos/{repository}/releases/latest")["tag_name"])
+    except OSError as error:
+        LOGGER.warning("GitHub API did not give the latest %s: %s", repository, error)
+        if tag := _latest_release_redirect(repository):
+            return tag
+        raise
+
+
+def _latest_release_redirect(repository: str) -> str | None:
+    """Return the tag the latest release page redirects to, not an API call."""
+    url = f"{GITHUB}/{repository}/releases/latest"
+    try:
+        with urlopen(Request(url, method="HEAD"), timeout=30) as response:  # noqa: S310 GitHub release URL
+            final_url = str(response.url)
+    except OSError as error:
+        LOGGER.warning("Following %s failed: %s", url, error)
+        return None
+    _, found, tag = final_url.partition("/releases/tag/")
+    return unquote(tag) if found and tag else None
 
 
 def _asset_digest(version: str, name: str) -> str | None:
@@ -114,10 +136,19 @@ def _asset_digest(version: str, name: str) -> str | None:
     return None
 
 
-def release_version(version: str) -> str:
-    """Return the QField release `4.2.9` for `4.2.9`, `v4.2.9` or `latest`."""
+def release_version(version: str, cache_dir: Path | None = None) -> str:
+    """Return the QField release `4.2.9` for `4.2.9`, `v4.2.9` or `latest`.
+
+    When GitHub cannot be asked, `latest` is the newest AppImage in the cache.
+    """
     if version == LATEST:
-        version = latest_release(QFIELD)
+        try:
+            version = latest_release(QFIELD)
+        except OSError:
+            if not (cached := _newest_cached_release(cache_dir)):
+                raise
+            LOGGER.warning("Using QField %s, the newest AppImage in the cache", cached)
+            version = cached
     match = VERSION_PATTERN.fullmatch(version)
     if not match:
         msg = f"Not a QField release version: {version!r}"
@@ -125,12 +156,24 @@ def release_version(version: str) -> str:
     return match[1]
 
 
+def _newest_cached_release(cache_dir: Path | None) -> str | None:
+    releases = [
+        match
+        for entry in entries(cache_dir)
+        if entry.kind == Kind.APPIMAGE
+        and (match := RELEASE_PATTERN.fullmatch(entry.name))
+    ]
+    if not releases:
+        return None
+    return max(releases, key=lambda match: tuple(map(int, match.groups())))[0]
+
+
 def appimage(version: str, cache_dir: Path | None = None) -> Path:
     """Download and extract a QField release AppImage once, and return its `AppRun`.
 
     :param version: A release such as `4.2.9`, or `latest`
     """
-    version = release_version(version)
+    version = release_version(version, cache_dir)
     target = _entry_path(Kind.APPIMAGE, version, cache_dir)
     _ensure(target, partial(_install_appimage, version), update=False)
     return target / "AppRun"

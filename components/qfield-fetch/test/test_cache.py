@@ -18,7 +18,10 @@
 
 from __future__ import annotations
 
+import threading
 from concurrent.futures import ThreadPoolExecutor
+from http import HTTPStatus
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from typing import TYPE_CHECKING
 
 import pytest
@@ -28,14 +31,17 @@ from qfield_fetch import (
     FetchError,
     Kind,
     appimage,
+    cache,
     entries,
     entry_path,
     qfield_source,
     qfieldcloud_source,
+    release_version,
     remove,
 )
 
 if TYPE_CHECKING:
+    from collections.abc import Iterator
     from pathlib import Path
 
     from github_stub import Repository
@@ -63,6 +69,61 @@ def test_appimage_versions_resolve_to_the_release(
     version: str, cache_dir: Path
 ) -> None:
     assert appimage(version) == cache_dir / "appimage/4.2.9/AppRun"
+
+
+class ReleasePages(BaseHTTPRequestHandler):
+    """Redirect the latest release page to its tag, as github.com does."""
+
+    def do_HEAD(self) -> None:
+        if self.path == "/opengisch/QField/releases/latest":
+            self.send_response(HTTPStatus.FOUND)
+            self.send_header("Location", "/opengisch/QField/releases/tag/v4.3.0")
+        elif self.path.startswith("/opengisch/QField/releases/tag/"):
+            self.send_response(HTTPStatus.OK)
+        else:
+            self.send_response(HTTPStatus.NOT_FOUND)
+        self.end_headers()
+
+    def log_message(self, format: str, *args: object) -> None:  # noqa: A002 named by BaseHTTPRequestHandler
+        pass
+
+
+@pytest.fixture
+def api_down(request: pytest.FixtureRequest, github_root: Path) -> None:
+    request.getfixturevalue("github")
+    (github_root / "api/repos/opengisch/QField/releases/latest").unlink()
+
+
+@pytest.fixture
+def release_pages(monkeypatch: pytest.MonkeyPatch) -> Iterator[None]:
+    with ThreadingHTTPServer(("127.0.0.1", 0), ReleasePages) as server:
+        thread = threading.Thread(target=server.serve_forever, daemon=True)
+        thread.start()
+        monkeypatch.setattr(cache, "GITHUB", f"http://127.0.0.1:{server.server_port}")
+        yield
+        server.shutdown()
+
+
+@pytest.mark.usefixtures("api_down", "release_pages")
+def test_latest_follows_the_release_page_without_the_api() -> None:
+    assert release_version("latest") == "4.3.0"
+
+
+@pytest.mark.usefixtures("api_down")
+def test_latest_is_the_newest_cached_appimage_without_github(
+    cache_dir: Path, caplog: pytest.LogCaptureFixture
+) -> None:
+    for name in ("4.2.9", "4.10.0", "4.9.1", "4.11.0-rc1"):
+        (cache_dir / "appimage" / name).mkdir(parents=True)
+
+    assert appimage("latest") == cache_dir / "appimage/4.10.0/AppRun"
+    assert "Using QField 4.10.0" in caplog.text
+
+
+@pytest.mark.usefixtures("api_down")
+def test_latest_without_github_or_a_cached_appimage_raises() -> None:
+    with pytest.raises(OSError, match="releases/latest"):
+        release_version("latest")
 
 
 def test_appimage_not_matching_its_digest_is_refused(
