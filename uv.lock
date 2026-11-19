@@ -1260,7 +1260,7 @@ provides-extras = ["cloud"]
 
 [[package]]
 name = "qfield-fetch"
-version = "0.2.0"
+version = "0.2.1"
 source = { editable = "components/qfield-fetch" }
 dependencies = [
     { name = "typer" },

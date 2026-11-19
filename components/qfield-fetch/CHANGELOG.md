@@ -2,6 +2,14 @@
 
 <!-- version list -->
 
+## v0.2.1 (2026-11-19)
+
+### Bug Fixes
+
+- Resolve latest without the github api when it fails
+  ([`00afc3b`](https://github.com/Joonalai/qfield-dev-tools/commit/00afc3b745a045a6c84b7195bef7ab85bb79c020))
+
+
 ## v0.2.0 (2026-11-13)
 
 ### Features
