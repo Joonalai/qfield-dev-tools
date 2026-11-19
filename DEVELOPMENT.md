@@ -146,14 +146,17 @@ Scopes tie a commit to a component even when it touches no files of it:
 - Only `feat` (minor), `fix` and `build` (patch) release. Use `chore`, `ci` or `docs` for root-only
   changes.
 - Merge pull requests with rebase merge, not squash, so each commit keeps its component.
-- `.github/workflows/release.yml` runs on `main` and releases in dependency order: qfield-fetch,
-  pytest-qfield, qfield-driver, pytest-qfield-e2e, qfield-mcp. Add a step for a new component.
+- `.github/workflows/release.yml` runs on `main` and uses
+  `nlsfi/python-monorepo-release-action@v1.0.0` to release workspace components in dependency order.
+  Components with a `[project].name` are discovered automatically; declare their workspace
+  dependencies in `pyproject.toml` so the action can determine their order. Manual dispatch defaults
+  to `dry_run: true`; disable it to publish.
 - Each release is published to PyPI right away with trusted publishing (environment `pypi`). A new
   package needs a pending publisher for `release.yml` first. PyPI consumes a matching pending
   publisher on the run's first upload, whichever package it is, so add it right before merging the
   pull request that first releases the package, and make sure that run releases nothing else.
-- After a release, `scripts/bump_dependents.py` raises the requirement in each dependent and commits
-  `build(deps): require <component> >=<version> in <dependent>`, which releases the dependent too.
+- After a release, the shared action raises outdated dependent requirements, updates `uv.lock`, and
+  commits them as `build(deps)`, which releases the dependents too.
 
 ## CI
 
