@@ -29,6 +29,10 @@ qfield-fetch remove source v4.2.9
 Versions take an optional `v`, and `latest` is the newest release. `qff` is a short
 alias of `qfield-fetch`.
 
+`latest` asks the GitHub API, with `GITHUB_TOKEN` if it is set, as anonymous calls are
+limited to 60 an hour. When the API fails, the release page's redirect is followed, and
+when GitHub cannot be reached at all, the newest AppImage in the cache is used.
+
 ## Cache
 
 `~/.cache/qfield-fetch` (or `$XDG_CACHE_HOME/qfield-fetch`) by default. Set `QFIELD_FETCH_CACHE_DIR`,
