@@ -13,6 +13,12 @@ inputs:
   python-version:
     description: Python for uv to use. Empty lets uv pick, the runner's Python on GitHub.
     default: ""
+  github-token:
+    description: >
+      Token for the GitHub API calls of qfield-fetch, exported as GITHUB_TOKEN. Anonymous
+      calls share 60 an hour per runner IP, which `latest` runs out of. Empty leaves
+      GITHUB_TOKEN as it is.
+    default: ${{ github.token }}
 
 runs:
   using: composite
@@ -38,6 +44,13 @@ runs:
       env:
         QFIELD_VERSION: ${{ inputs.qfield-version }}
       run: echo "QFIELD_VERSION=$QFIELD_VERSION" >> "$GITHUB_ENV"
+
+    - name: Export the GitHub token
+      if: inputs.github-token != ''
+      shell: bash
+      env:
+        TOKEN: ${{ inputs.github-token }}
+      run: echo "GITHUB_TOKEN=$TOKEN" >> "$GITHUB_ENV"
 
     # The run id in the key saves a new entry each run, so `latest` follows releases.
     - uses: actions/cache@v4

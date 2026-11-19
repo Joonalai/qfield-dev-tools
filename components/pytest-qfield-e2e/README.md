@@ -97,7 +97,8 @@ view is open.
 
 The `setup-qfield-e2e` action installs Xvfb and the AppImage's system libraries on an
 Ubuntu runner, sets up uv and caches the AppImages between runs. Input `python-version`
-picks the Python for uv. Pin the action to a commit SHA.
+picks the Python for uv. The job's token is exported as `GITHUB_TOKEN` (input
+`github-token`) so resolving `latest` is not rate limited. Pin the action to a commit SHA.
 
 ```yaml
 jobs:

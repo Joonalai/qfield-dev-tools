@@ -278,7 +278,8 @@ jobs:
 ```
 
 The virtualenv (input `venv`, default `.venv`) is on `PATH` for later steps, and
-`QGIS_IN_CI` is set so QGIS runs without a display.
+`QGIS_IN_CI` is set so QGIS runs without a display. The job's token is exported as
+`GITHUB_TOKEN` (input `github-token`) so resolving `latest` is not rate limited.
 
 ## Development environment
 
