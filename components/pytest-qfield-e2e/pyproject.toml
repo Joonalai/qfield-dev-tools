@@ -17,12 +17,12 @@ classifiers = [
 ]
 dependencies = [
     "pytest>=8",
-    "qfield-driver>=0.3.0,<0.4",
+    "qfield-driver>=0.4.0,<0.5",
     "qfield-fetch",
 ]
 
 [project.optional-dependencies]
-cloud = ["qfield-driver[cloud]>=0.3.0,<0.4"]
+cloud = ["qfield-driver[cloud]>=0.4.0,<0.5"]
 
 [project.urls]
 homepage = "https://github.com/Joonalai/qfield-dev-tools"
