@@ -22,7 +22,9 @@ See :mod:`pytest_qfield.stub_interface.qgis_stubs` for the
 and properties that return fresh ``QObject`` subclasses to QML.
 """
 
+import math
 import uuid
+from enum import IntEnum
 from typing import TYPE_CHECKING, cast
 
 from PyQt6.QtCore import QObject, QPointF, QSizeF, pyqtProperty, pyqtSignal, pyqtSlot
@@ -350,30 +352,266 @@ class QFieldProjectedPositionStub(QObject):
         return self._y
 
 
+class QFieldAccuracyQuality(IntEnum):
+    """``GnssPositionInformation::AccuracyQuality`` values."""
+
+    UNDETERMINED = 0
+    BAD = 1
+    OK = 2
+    EXCELLENT = 3
+
+
+def _metres_or_nan(accuracy: float | None) -> float:
+    return math.nan if accuracy is None else float(accuracy)
+
+
+class QFieldGnssPositionInformationStub(QObject):
+    """Accuracy surface of GnssPositionInformation, ``Positioning.positionInformation``.
+
+    https://github.com/opengisch/QField/blob/master/src/core/positioning/gnsspositioninformation.h
+
+    QField exposes it as a value type, so the positioning stub replaces the
+    whole object on each change instead of mutating it. An accuracy of
+    ``None`` is invalid, like QField's NaN: ``hacc`` (horizontal accuracy)
+    reads NaN and ``haccValid`` false, and ``vacc`` (vertical accuracy) the
+    same. The QML names are QField's.
+    """
+
+    def __init__(
+        self,
+        horizontal_accuracy: float | None = None,
+        vertical_accuracy: float | None = None,
+        accuracy_quality: QFieldAccuracyQuality = QFieldAccuracyQuality.UNDETERMINED,
+        parent: QObject | None = None,
+    ) -> None:
+        super().__init__(parent=parent)
+        self._hacc = _metres_or_nan(horizontal_accuracy)
+        self._vacc = _metres_or_nan(vertical_accuracy)
+        self._accuracy_quality = accuracy_quality
+
+    @pyqtProperty(float, constant=True)
+    def hacc(self) -> float:
+        return self._hacc
+
+    @pyqtProperty(bool, constant=True)
+    def haccValid(self) -> bool:
+        return not math.isnan(self._hacc)
+
+    @pyqtProperty(float, constant=True)
+    def vacc(self) -> float:
+        return self._vacc
+
+    @pyqtProperty(bool, constant=True)
+    def vaccValid(self) -> bool:
+        return not math.isnan(self._vacc)
+
+    @pyqtProperty(int, constant=True)
+    def accuracyQuality(self) -> int:
+        return self._accuracy_quality
+
+
 class QFieldPositioningStub(QObject):
     """Stub implementation for Positioning, the QML ``positionSource`` item.
 
     https://github.com/opengisch/QField/blob/master/src/core/positioning/positioning.h
+
+    ``horizontal_accuracy`` and ``vertical_accuracy`` are the fix accuracies in
+    metres, read by QML as ``positionInformation.hacc`` and ``vacc``, ``None``
+    when the
+    receiver doesn't report them. ``positionInformation.accuracyQuality`` is
+    classified against ``badAccuracyThreshold`` and
+    ``excellentAccuracyThreshold`` the way QField does. Their defaults are
+    QField's ``positioningSettings`` defaults, which the app binds them to.
+    ``projectedHorizontalAccuracy`` equals the horizontal accuracy, as for a
+    project CRS in
+    metres. Call :meth:`set_accuracy` to change the accuracy mid-test.
+
+    Unlike QField, which reclassifies on the next fix, a threshold change
+    reclassifies the current fix and emits ``positionInformationChanged``.
     """
 
-    def __init__(
+    positionInformationChanged = pyqtSignal()
+    badAccuracyThresholdChanged = pyqtSignal()
+    excellentAccuracyThresholdChanged = pyqtSignal()
+
+    def __init__(  # noqa: PLR0913
         self,
         x: float = 0.0,
         y: float = 0.0,
         active: bool = True,
         parent: QObject | None = None,
+        *,
+        horizontal_accuracy: float | None = None,
+        vertical_accuracy: float | None = None,
+        bad_accuracy_threshold: float = 5.0,
+        excellent_accuracy_threshold: float = 1.0,
     ) -> None:
         super().__init__(parent=parent)
         self._projected_position = QFieldProjectedPositionStub(x, y, parent=self)
         self._active = active
+        self._bad_accuracy_threshold = bad_accuracy_threshold
+        self._excellent_accuracy_threshold = excellent_accuracy_threshold
+        self._horizontal_accuracy = horizontal_accuracy
+        self._vertical_accuracy = vertical_accuracy
+        self._position_information = self._new_position_information()
 
-    @pyqtProperty(QObject, constant=True)
+    def set_accuracy(
+        self,
+        horizontal_accuracy: float | None,
+        vertical_accuracy: float | None = None,
+    ) -> None:
+        """Report a fix with new accuracies, ``None`` for an invalid one.
+
+        Leaving out ``vertical_accuracy`` makes it invalid.
+        """
+        self._horizontal_accuracy = horizontal_accuracy
+        self._vertical_accuracy = vertical_accuracy
+        self._update_position_information()
+
+    @pyqtProperty(QObject, notify=positionInformationChanged)
     def projectedPosition(self) -> QFieldProjectedPositionStub:
         return self._projected_position
+
+    @pyqtProperty(QObject, notify=positionInformationChanged)
+    def positionInformation(self) -> QFieldGnssPositionInformationStub:
+        return self._position_information
+
+    @pyqtProperty(float, notify=positionInformationChanged)
+    def projectedHorizontalAccuracy(self) -> float:
+        return self._position_information.hacc
 
     @pyqtProperty(bool, constant=True)
     def active(self) -> bool:
         return self._active
+
+    @pyqtProperty(float, notify=badAccuracyThresholdChanged)
+    def badAccuracyThreshold(self) -> float:
+        return self._bad_accuracy_threshold
+
+    @badAccuracyThreshold.setter  # type: ignore[no-redef]
+    def badAccuracyThreshold(self, value: float) -> None:
+        if self._bad_accuracy_threshold == value:
+            return
+        self._bad_accuracy_threshold = float(value)
+        self.badAccuracyThresholdChanged.emit()
+        self._update_position_information()
+
+    @pyqtProperty(float, notify=excellentAccuracyThresholdChanged)
+    def excellentAccuracyThreshold(self) -> float:
+        return self._excellent_accuracy_threshold
+
+    @excellentAccuracyThreshold.setter  # type: ignore[no-redef]
+    def excellentAccuracyThreshold(self, value: float) -> None:
+        if self._excellent_accuracy_threshold == value:
+            return
+        self._excellent_accuracy_threshold = float(value)
+        self.excellentAccuracyThresholdChanged.emit()
+        self._update_position_information()
+
+    def _update_position_information(self) -> None:
+        self._position_information = self._new_position_information()
+        self.positionInformationChanged.emit()
+
+    def _new_position_information(self) -> QFieldGnssPositionInformationStub:
+        # Parented to self: QML may still hold the previous one.
+        information = QFieldGnssPositionInformationStub(
+            self._horizontal_accuracy,
+            self._vertical_accuracy,
+            self._accuracy_quality(),
+            parent=self,
+        )
+        QQmlEngine.setObjectOwnership(
+            information, QQmlEngine.ObjectOwnership.CppOwnership
+        )
+        return information
+
+    def _accuracy_quality(self) -> QFieldAccuracyQuality:
+        bad = self._bad_accuracy_threshold
+        excellent = self._excellent_accuracy_threshold
+        if math.isnan(bad) or math.isnan(excellent):
+            return QFieldAccuracyQuality.UNDETERMINED
+        accuracy = self._horizontal_accuracy
+        if accuracy is None or math.isnan(accuracy):
+            return QFieldAccuracyQuality.BAD
+        if accuracy <= excellent:
+            return QFieldAccuracyQuality.EXCELLENT
+        if accuracy <= bad:
+            return QFieldAccuracyQuality.OK
+        return QFieldAccuracyQuality.BAD
+
+
+class QFieldPositioningSettingsStub(QObject):
+    """Accuracy part of PositioningSettings, the QML ``positioningSettings`` item.
+
+    https://github.com/opengisch/QField/blob/master/src/qml/PositioningSettings.qml
+
+    Defaults are QField's. Unlike in QField, the positioning stub's thresholds
+    don't follow ``accuracyBad`` and ``accuracyExcellent``; set both when a
+    test needs them to agree.
+    """
+
+    accuracyIndicatorChanged = pyqtSignal()
+    accuracyBadChanged = pyqtSignal()
+    accuracyExcellentChanged = pyqtSignal()
+    accuracyRequirementChanged = pyqtSignal()
+
+    def __init__(
+        self,
+        accuracy_indicator: bool = False,
+        accuracy_bad: float = 5.0,
+        accuracy_excellent: float = 1.0,
+        accuracy_requirement: bool = False,
+        parent: QObject | None = None,
+    ) -> None:
+        super().__init__(parent=parent)
+        self._accuracy_indicator = accuracy_indicator
+        self._accuracy_bad = accuracy_bad
+        self._accuracy_excellent = accuracy_excellent
+        self._accuracy_requirement = accuracy_requirement
+
+    @pyqtProperty(bool, notify=accuracyIndicatorChanged)
+    def accuracyIndicator(self) -> bool:
+        return self._accuracy_indicator
+
+    @accuracyIndicator.setter  # type: ignore[no-redef]
+    def accuracyIndicator(self, value: bool) -> None:
+        if self._accuracy_indicator == value:
+            return
+        self._accuracy_indicator = bool(value)
+        self.accuracyIndicatorChanged.emit()
+
+    @pyqtProperty(float, notify=accuracyBadChanged)
+    def accuracyBad(self) -> float:
+        return self._accuracy_bad
+
+    @accuracyBad.setter  # type: ignore[no-redef]
+    def accuracyBad(self, value: float) -> None:
+        if self._accuracy_bad == value:
+            return
+        self._accuracy_bad = float(value)
+        self.accuracyBadChanged.emit()
+
+    @pyqtProperty(float, notify=accuracyExcellentChanged)
+    def accuracyExcellent(self) -> float:
+        return self._accuracy_excellent
+
+    @accuracyExcellent.setter  # type: ignore[no-redef]
+    def accuracyExcellent(self, value: float) -> None:
+        if self._accuracy_excellent == value:
+            return
+        self._accuracy_excellent = float(value)
+        self.accuracyExcellentChanged.emit()
+
+    @pyqtProperty(bool, notify=accuracyRequirementChanged)
+    def accuracyRequirement(self) -> bool:
+        return self._accuracy_requirement
+
+    @accuracyRequirement.setter  # type: ignore[no-redef]
+    def accuracyRequirement(self, value: bool) -> None:
+        if self._accuracy_requirement == value:
+            return
+        self._accuracy_requirement = bool(value)
+        self.accuracyRequirementChanged.emit()
 
 
 class QFieldGeometryWrapperStub(QObject):
@@ -552,6 +790,130 @@ class QFieldFeatureListModelSelectionStub(QObject):
         return self._model.set_features_calls[-1]
 
 
+class QFieldMoveFeaturesToolbarStub(QObject):
+    """Stub for ``moveFeaturesToolbar``, a ConfirmationToolbar in qgismobileapp.qml.
+
+    https://github.com/opengisch/QField/blob/master/src/qml/qgismobileapp.qml
+
+    Set ``moveFeaturesRequested`` to start a move as QField's form does.
+    ``confirm()`` and ``cancel()`` clear it and emit ``moveConfirmed`` and
+    ``moveCanceled``, like QField's handlers.
+    """
+
+    moveFeaturesRequestedChanged = pyqtSignal()
+    confirm = pyqtSignal()
+    cancel = pyqtSignal()
+    moveConfirmed = pyqtSignal()
+    moveCanceled = pyqtSignal()
+
+    def __init__(self, parent: QObject | None = None) -> None:
+        super().__init__(parent=parent)
+        self._move_features_requested = False
+        self.confirm.connect(self._on_confirm)
+        self.cancel.connect(self._on_cancel)
+
+    @pyqtProperty(bool, notify=moveFeaturesRequestedChanged)
+    def moveFeaturesRequested(self) -> bool:
+        return self._move_features_requested
+
+    @moveFeaturesRequested.setter  # type: ignore[no-redef]
+    def moveFeaturesRequested(self, value: bool) -> None:
+        if self._move_features_requested == value:
+            return
+        self._move_features_requested = bool(value)
+        self.moveFeaturesRequestedChanged.emit()
+
+    def _on_confirm(self) -> None:
+        self.moveFeaturesRequested = False  # type: ignore[method-assign]
+        self.moveConfirmed.emit()
+
+    def _on_cancel(self) -> None:
+        self.moveFeaturesRequested = False  # type: ignore[method-assign]
+        self.moveCanceled.emit()
+
+
+class QFieldRotateFeaturesToolbarStub(QObject):
+    """Stub for ``rotateFeaturesToolbar``, a ConfirmationToolbar in qgismobileapp.qml.
+
+    https://github.com/opengisch/QField/blob/master/src/qml/qgismobileapp.qml
+
+    Set ``rotateFeaturesRequested`` to start a rotation as QField's form does.
+    ``confirm()`` and ``cancel()`` clear it and emit ``rotateConfirmed`` and
+    ``rotateCanceled``, like QField's handlers.
+    """
+
+    rotateFeaturesRequestedChanged = pyqtSignal()
+    confirm = pyqtSignal()
+    cancel = pyqtSignal()
+    rotateConfirmed = pyqtSignal()
+    rotateCanceled = pyqtSignal()
+
+    def __init__(self, parent: QObject | None = None) -> None:
+        super().__init__(parent=parent)
+        self._rotate_features_requested = False
+        self.confirm.connect(self._on_confirm)
+        self.cancel.connect(self._on_cancel)
+
+    @pyqtProperty(bool, notify=rotateFeaturesRequestedChanged)
+    def rotateFeaturesRequested(self) -> bool:
+        return self._rotate_features_requested
+
+    @rotateFeaturesRequested.setter  # type: ignore[no-redef]
+    def rotateFeaturesRequested(self, value: bool) -> None:
+        if self._rotate_features_requested == value:
+            return
+        self._rotate_features_requested = bool(value)
+        self.rotateFeaturesRequestedChanged.emit()
+
+    def _on_confirm(self) -> None:
+        self.rotateFeaturesRequested = False  # type: ignore[method-assign]
+        self.rotateConfirmed.emit()
+
+    def _on_cancel(self) -> None:
+        self.rotateFeaturesRequested = False  # type: ignore[method-assign]
+        self.rotateCanceled.emit()
+
+
+class QFieldDigitizingToolbarStub(QObject):
+    """Stub for DigitizingToolbar, the form's ``digitizingToolbar``.
+
+    https://github.com/opengisch/QField/blob/master/src/qml/DigitizingToolbar.qml
+
+    ``geometryRequested`` is true while the form asks the user to digitize a
+    geometry. ``confirm()`` is a function that emits ``confirmed``, ``cancel``
+    a signal, as in QField. Both clear ``geometryRequested`` like QField's
+    handlers.
+    """
+
+    geometryRequestedChanged = pyqtSignal()
+    confirmed = pyqtSignal()
+    cancel = pyqtSignal()
+
+    def __init__(self, parent: QObject | None = None) -> None:
+        super().__init__(parent=parent)
+        self._geometry_requested = False
+        self.confirmed.connect(self._on_done)
+        self.cancel.connect(self._on_done)
+
+    @pyqtSlot()
+    def confirm(self) -> None:
+        self.confirmed.emit()
+
+    @pyqtProperty(bool, notify=geometryRequestedChanged)
+    def geometryRequested(self) -> bool:
+        return self._geometry_requested
+
+    @geometryRequested.setter  # type: ignore[no-redef]
+    def geometryRequested(self, value: bool) -> None:
+        if self._geometry_requested == value:
+            return
+        self._geometry_requested = bool(value)
+        self.geometryRequestedChanged.emit()
+
+    def _on_done(self) -> None:
+        self.geometryRequested = False  # type: ignore[method-assign]
+
+
 class QFieldFeatureListFormStub(QObject):
     """Stub implementation for ``FeatureListForm`` (objectName ``"featureForm"``).
 
@@ -582,12 +944,27 @@ class QFieldFeatureListFormStub(QObject):
         super().__init__(parent=parent)
         self._model = QFieldMultiFeatureListModelStub(parent=self)
         self._selection = QFieldFeatureListModelSelectionStub(self._model, parent=self)
+        self._digitizing_toolbar = QFieldDigitizingToolbarStub(parent=self)
+        self._move_features_toolbar = QFieldMoveFeaturesToolbarStub(parent=self)
+        self._rotate_features_toolbar = QFieldRotateFeaturesToolbarStub(parent=self)
         self._state = ""
         self._visible = False
 
     @pyqtProperty(QObject, constant=True)
     def model(self) -> QFieldMultiFeatureListModelStub:
         return self._model
+
+    @pyqtProperty(QObject, constant=True)
+    def digitizingToolbar(self) -> QFieldDigitizingToolbarStub:
+        return self._digitizing_toolbar
+
+    @pyqtProperty(QObject, constant=True)
+    def moveFeaturesToolbar(self) -> QFieldMoveFeaturesToolbarStub:
+        return self._move_features_toolbar
+
+    @pyqtProperty(QObject, constant=True)
+    def rotateFeaturesToolbar(self) -> QFieldRotateFeaturesToolbarStub:
+        return self._rotate_features_toolbar
 
     @pyqtProperty(QObject, constant=True)
     def selection(self) -> QFieldFeatureListModelSelectionStub:

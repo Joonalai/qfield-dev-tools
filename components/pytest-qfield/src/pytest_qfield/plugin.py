@@ -43,6 +43,7 @@ from pytest_qfield.stub_interface.qfield_stubs import (
     QFieldMapCanvasStub,
     QFieldOverlayFeatureFormDrawerStub,
     QFieldPlatformUtilitiesStub,
+    QFieldPositioningSettingsStub,
     QFieldPositioningStub,
     QFieldStringUtilsStub,
     QFieldThemeStub,
@@ -279,11 +280,21 @@ def qfield_theme_stub() -> QFieldThemeStub:
 def qfield_positioning_stub() -> QFieldPositioningStub:
     """Stub implementation for Positioning (QML `positionSource`).
 
-    The default stub reports `active = True` and a position at the origin.
-    Override this fixture to inject custom coordinates or simulate inactive
-    positioning.
+    The default stub reports `active = True`, a position at the origin and
+    no valid accuracy. Override this fixture to inject custom coordinates and
+    accuracy or simulate inactive positioning, or call `set_accuracy` on it.
     """
     return QFieldPositioningStub()
+
+
+@pytest.fixture
+def qfield_positioning_settings_stub() -> QFieldPositioningSettingsStub:
+    """Stub implementation for PositioningSettings (QML `positioningSettings`).
+
+    The instance is auto-registered on the iface stub under the
+    `positioningSettings` name with QField's default accuracy settings.
+    """
+    return QFieldPositioningSettingsStub()
 
 
 @pytest.fixture
@@ -335,6 +346,7 @@ def qfield_map_canvas_stub(qgis_canvas: "QgsMapCanvas") -> QFieldMapCanvasStub:
 def _attach_default_iface_stubs(  # noqa: PLR0913, PLR0917
     qfield_iface: QFieldAppInterfaceStub,
     qfield_positioning_stub: QFieldPositioningStub,
+    qfield_positioning_settings_stub: QFieldPositioningSettingsStub,
     qfield_geometry_highlighter_stub: QFieldGeometryHighlighterStub,
     qfield_feature_list_form_stub: QFieldFeatureListFormStub,
     qfield_overlay_feature_form_drawer_stub: QFieldOverlayFeatureFormDrawerStub,
@@ -342,9 +354,9 @@ def _attach_default_iface_stubs(  # noqa: PLR0913, PLR0917
 ) -> None:
     """Auto-wire default stubs onto the iface before QML loads.
 
-    - ``positionSource``, ``geometryHighlighter``, ``featureForm`` and
-      ``overlayFeatureFormDrawer`` are registered as named items reachable via
-      ``iface.findItemByObjectName``.
+    - ``positionSource``, ``positioningSettings``, ``geometryHighlighter``,
+      ``featureForm`` and ``overlayFeatureFormDrawer`` are registered as named
+      items reachable via ``iface.findItemByObjectName``.
     - The map canvas stub is set as ``iface.qml_map_canvas`` and returned by
       ``iface.mapCanvas()``.
 
@@ -354,6 +366,9 @@ def _attach_default_iface_stubs(  # noqa: PLR0913, PLR0917
     stub fixture.
     """
     qfield_iface.register_named_item("positionSource", qfield_positioning_stub)
+    qfield_iface.register_named_item(
+        "positioningSettings", qfield_positioning_settings_stub
+    )
     qfield_iface.register_named_item(
         "geometryHighlighter", qfield_geometry_highlighter_stub
     )
