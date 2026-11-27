@@ -25,6 +25,7 @@ import pytest
 from PyQt6.QtCore import QObject, QSettings, Qt, QUrl
 from PyQt6.QtQml import (
     QQmlApplicationEngine,
+    QQmlComponent,
     qmlRegisterModule,
     qmlRegisterType,
 )
@@ -104,6 +105,7 @@ def qfield_bot(  # noqa: PLR0913, PLR0917
     qfield_qml_extra_context_properties: dict[str, object],
     tmp_path: "Path",
     qfield_qml_import_path: Path,
+    main_menu_qml_path: Path,
 ) -> Iterator["QFieldBot"]:
     """Fixture used to create a QFieldBot instance for use during testing."""
     engine = QQmlApplicationEngine()
@@ -164,8 +166,38 @@ def qfield_bot(  # noqa: PLR0913, PLR0917
         qgis_main_window=qgis_parent,
         qml_main_window=qml_main_window,
     )
+    # After the main window, which the menu pops up in, but before any plugin
+    # loads, so the plugin's projectLoaded handler finds it.
+    if qfield_iface.findItemByObjectName("mainMenu") is None:
+        qfield_iface.register_named_item(
+            "mainMenu", _create_main_menu(engine, main_menu_qml_path, qml_main_window)
+        )
     # Yielding to keep stub instances alive
     yield qfield_bot  # noqa: PT022
+
+
+@pytest.fixture
+def main_menu_qml_path() -> Path:
+    """Path to the QML of the stand-in for QField's main menu (`mainMenu`).
+
+    The default mirrors QField's items and their icons. Override this fixture
+    to use another menu.
+    """
+    return Path(__file__).parent / "main_menu.qml"
+
+
+@pytest.fixture
+def qfield_main_menu(qfield_bot: QFieldBot) -> QObject:
+    """Return the QQC2 Menu registered on the iface as `mainMenu`.
+
+    It pops up in the main window, so `open()` shows it and its items'
+    `visible` reads true while it is open.
+    """
+    menu = qfield_bot.iface.findItemByObjectName("mainMenu")
+    if menu is None:
+        msg = "mainMenu is not registered on the iface"
+        raise RuntimeError(msg)
+    return menu
 
 
 @pytest.fixture
@@ -542,6 +574,18 @@ def _embed_qml_window_in_qgis_main_window(
     qml_overlay_widget.raise_()
 
     qgis_parent.setCentralWidget(central_widget)
+
+
+def _create_main_menu(
+    engine: QQmlApplicationEngine, qml_path: Path, main_window: QObject
+) -> QObject:
+    component = QQmlComponent(engine, QUrl.fromLocalFile(str(qml_path)))
+    menu = component.createWithInitialProperties({"parent": main_window})
+    if menu is None:
+        msg = f"Could not create the main menu from {qml_path}"
+        raise RuntimeError(msg, [error.toString() for error in component.errors()])
+    menu.setParent(main_window)
+    return menu
 
 
 def _load_qml_overlay_widget(

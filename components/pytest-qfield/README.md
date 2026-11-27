@@ -85,6 +85,14 @@ def qfield_positioning_stub() -> QFieldPositioningStub:
 
 See [`test/test_position_accuracy.py`](test/test_position_accuracy.py) for a plugin that cancels QField's move, rotate and digitize tools when the fix is too inaccurate.
 
+#### Main Menu
+
+`iface.findItemByObjectName("mainMenu")` returns a QQC2 `Menu` that mirrors QField's main menu: the undo/redo row, a separator, a hidden Sensors item and separator, Plugin Manager, Settings, Message Log, Lock Screen and About QField, with QField's icon sources, `Theme.defaultFont` and `Theme.menuItemLeftPadding`. The items do nothing when triggered. A plugin can find QField's items by icon and `insertItem` / `removeItem` its own. The menu is registered when `qfield_bot` is created, before the plugin loads, so a `loadProjectEnded` handler finds it. It pops up in the main window, so `call_qml(menu, "open")` opens it and its items' `visible` turns true. The `qfield_main_menu` fixture returns it. Override `main_menu_qml_path` to use another menu.
+
+QField's icon files are not bundled, so the stand-in items show text only. A plugin item that copies an icon source logs a `Cannot open` warning when the menu opens.
+
+See [`test/test_main_menu.py`](test/test_main_menu.py) for a plugin that adds an item under QField's Settings.
+
 See [`test/test_named_item_overrides.py`](test/test_named_item_overrides.py) for a complete working example. To assert behaviour when a named item is *missing*, clear the registration on the iface stub or override the fixture to return a sentinel.
 
 #### Map Canvas Stub
@@ -193,6 +201,7 @@ The `qfield_bot` fixture provides several methods to help testing:
 - `open_overlay_form(layer, feature_id)`: Opens the `overlayFeatureFormDrawer` stub (`opened = True`) for a feature, as QField does after digitizing.
 - `close_forms()`: Hides `featureForm` (`visible = False`, `state = "Hidden"`) and closes `overlayFeatureFormDrawer` (`opened = False`).
 - `load_js_function(js_file, function_name, params)`: Loads a JavaScript function from a file for direct testing.
+- `call_plugin(name, *args)`: Calls a function or emits a signal of the loaded plugin's root object and returns the result as Python values (JS objects as dicts, arrays as lists, QObjects as is). Raises `AttributeError` for an unknown name and `RuntimeError` when the function throws. `call_qml(obj, name, *args)` does the same on any QML object.
 
 ### Window layout
 
