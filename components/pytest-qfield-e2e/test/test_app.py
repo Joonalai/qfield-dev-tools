@@ -24,6 +24,7 @@ import pytest
 
 from qfield_driver import actions
 from qfield_driver.app import DriverError, QFieldApp
+from qfield_driver.positioning import FixQuality
 
 pytestmark = pytest.mark.qfield_app
 
@@ -95,6 +96,24 @@ def test_fake_gnss_position(qfield_app: QFieldApp, project_file: Path) -> None:
     qfield_app.lose_position()
     qfield_app.set_position(x, y)
     qfield_app.wait_for_position(x, y)
+
+
+def test_fake_gnss_accuracy(qfield_app: QFieldApp, project_file: Path) -> None:
+    actions.open_project(qfield_app, project_file)
+    x, y = 385000.0, 6672000.0
+
+    qfield_app.set_position(
+        x, y, horizontal_accuracy=4.5, vertical_accuracy=9.0, fix_quality=FixQuality.GPS
+    )
+
+    qfield_app.wait_for_position(x, y, horizontal_accuracy=4.5)
+    info = qfield_app.eval("""
+      const info = find('positionSource').positionInformation;
+      return [info.vacc, info.quality];
+    """)
+    assert info == [9.0, 1]
+    qfield_app.set_position(x, y)
+    qfield_app.wait_for_position(x, y, horizontal_accuracy=0.01)
 
 
 def test_typing_reaches_a_text_field(qfield_app: QFieldApp) -> None:
