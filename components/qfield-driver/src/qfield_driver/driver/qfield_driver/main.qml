@@ -26,6 +26,11 @@ Item {
     return item;
   }
 
+  // Visual children, or the content of a Popup, which has no children.
+  function _pqfKids(item) {
+    return item.children || (item.contentItem ? [item.contentItem] : []);
+  }
+
   // Depth first search over visual children, hidden ones included.
   function _pqfWalk(item, test, depth) {
     if (!item || (depth || 0) > 60) {
@@ -34,7 +39,7 @@ Item {
     if (test(item)) {
       return item;
     }
-    const kids = item.children || [];
+    const kids = _pqfKids(item);
     for (let i = 0; i < kids.length; i++) {
       const hit = _pqfWalk(kids[i], test, (depth || 0) + 1);
       if (hit) {
@@ -52,7 +57,7 @@ Item {
     if (test(item)) {
       hits.push(item);
     }
-    const kids = item.children || [];
+    const kids = _pqfKids(item);
     for (let i = 0; i < kids.length; i++) {
       _pqfWalkAll(kids[i], test, (depth || 0) + 1, hits);
     }
