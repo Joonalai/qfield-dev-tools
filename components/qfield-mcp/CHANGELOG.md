@@ -2,6 +2,19 @@
 
 <!-- version list -->
 
+## v0.3.0 (2026-11-27)
+
+### Build System
+
+- **deps**: Require qfield-driver >=0.4.0 in dependents
+  ([`b737f18`](https://github.com/Joonalai/qfield-dev-tools/commit/b737f1884838204790692d5a45932fc3d7a4808f))
+
+### Features
+
+- Pass accuracy and fix quality to set_position
+  ([`e53d7d8`](https://github.com/Joonalai/qfield-dev-tools/commit/e53d7d8b0090d045a46e36b47c2355e77fac11f3))
+
+
 ## v0.2.0 (2026-11-14)
 
 ### Bug Fixes
