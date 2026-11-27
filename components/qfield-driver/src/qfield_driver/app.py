@@ -38,7 +38,12 @@ from qfield_driver.display import (
     start_xvfb,
     terminate,
 )
-from qfield_driver.positioning import NmeaServer
+from qfield_driver.positioning import (
+    DEFAULT_HORIZONTAL_ACCURACY,
+    DEFAULT_VERTICAL_ACCURACY,
+    FixQuality,
+    NmeaServer,
+)
 
 LOGGER = logging.getLogger(__name__)
 
@@ -431,10 +436,22 @@ class QFieldApp:
 
     # Positioning
 
-    def set_position(self, x: float, y: float) -> None:
+    def set_position(
+        self,
+        x: float,
+        y: float,
+        *,
+        horizontal_accuracy: float = DEFAULT_HORIZONTAL_ACCURACY,
+        vertical_accuracy: float = DEFAULT_VERTICAL_ACCURACY,
+        fix_quality: FixQuality = FixQuality.RTK,
+    ) -> None:
         """Feed a GNSS fix at a project CRS coordinate.
 
         The first call switches QField's positioning to a fake TCP receiver.
+
+        :param horizontal_accuracy: Accuracy on the map plane in metres
+        :param vertical_accuracy: Altitude accuracy in metres
+        :param fix_quality: How the receiver computed the fix
         """
         wgs84 = self.eval(f"""
           const p = GeometryUtils.reprojectPointToWgs84(
@@ -444,9 +461,12 @@ class QFieldApp:
         """)
         if self._gnss is None:
             self._gnss = NmeaServer()
-            self._gnss.set_position(*wgs84)
-        else:
-            self._gnss.set_position(*wgs84)
+        self._gnss.set_position(
+            *wgs84,
+            horizontal_accuracy=horizontal_accuracy,
+            vertical_accuracy=vertical_accuracy,
+            fix_quality=fix_quality,
+        )
         device = json.dumps(self._gnss.device_id)
         # lose_position deactivates the source.
         self.eval(f"""
@@ -455,10 +475,27 @@ class QFieldApp:
           source.active = true;
         """)
 
-    def wait_for_position(self, x: float, y: float, tolerance: float = 0.5) -> None:
+    def wait_for_position(
+        self,
+        x: float,
+        y: float,
+        tolerance: float = 0.5,
+        *,
+        horizontal_accuracy: float | None = None,
+    ) -> None:
+        """Wait until QField is at a position, and at an accuracy if given."""
+        accuracy = (
+            "true"
+            if horizontal_accuracy is None
+            else "info.haccValid"
+            f" && Math.abs(info.hacc - {horizontal_accuracy}) < 0.001"
+        )
         self.wait(f"""
-          const p = find('positionSource').projectedPosition;
-          return Math.abs(p.x - {x}) < {tolerance} && Math.abs(p.y - {y}) < {tolerance};
+          const source = find('positionSource');
+          const p = source.projectedPosition;
+          const info = source.positionInformation;
+          return Math.abs(p.x - {x}) < {tolerance} && Math.abs(p.y - {y}) < {tolerance}
+            && {accuracy};
         """)
 
     def lose_position(self) -> None:

@@ -122,10 +122,26 @@ its QML sources.
 ### Positioning
 
 ```python
+from qfield_driver.positioning import FixQuality
+
 app.set_position(389870.0, 6678167.0)  # project CRS
 app.wait_for_position(389870.0, 6678167.0)
+app.set_position(
+    389870.0,
+    6678167.0,
+    horizontal_accuracy=4.0,
+    vertical_accuracy=8.0,
+    fix_quality=FixQuality.GPS,
+)
+app.wait_for_position(389870.0, 6678167.0, horizontal_accuracy=4.0)
 app.lose_position()
 ```
+
+Fixes default to `FixQuality.RTK` at 1 cm horizontal and 2 cm vertical accuracy.
+The accuracies are in metres and reach QField as `positionInformation.hacc` and
+`vacc`. `FixQuality` (from `qfield_driver.positioning`) says how the receiver
+computed the fix: `GPS` (metres), `DGPS` (below a metre), `FLOAT_RTK`
+(decimetres) or `RTK` (centimetres). QField shows no position for `NO_FIX`.
 
 ## QFieldCloud
 
