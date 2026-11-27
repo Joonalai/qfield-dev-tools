@@ -2,6 +2,17 @@
 
 <!-- version list -->
 
+## v0.4.0 (2026-11-27)
+
+### Features
+
+- Open and list the main menu, walk into popups
+  ([`e86220d`](https://github.com/Joonalai/qfield-dev-tools/commit/e86220de5a95d99346527d22080c2dd005561027))
+
+- Set the accuracy and fix quality of fake gnss fixes
+  ([`62518f1`](https://github.com/Joonalai/qfield-dev-tools/commit/62518f151cfb20f29c814adbc31ad342206df8d0))
+
+
 ## v0.3.0 (2026-11-14)
 
 ### Features
