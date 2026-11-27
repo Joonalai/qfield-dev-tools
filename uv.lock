@@ -1091,7 +1091,7 @@ wheels = [
 
 [[package]]
 name = "pytest-qfield"
-version = "0.12.0"
+version = "0.13.0"
 source = { editable = "components/pytest-qfield" }
 dependencies = [
     { name = "pytest-qgis" },

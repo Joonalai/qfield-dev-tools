@@ -2,6 +2,17 @@
 
 <!-- version list -->
 
+## v0.13.0 (2026-11-27)
+
+### Features
+
+- Stub position accuracy, positioning settings and form toolbars
+  ([`12493b7`](https://github.com/Joonalai/qfield-dev-tools/commit/12493b7a3c60fb9c3ad893657238a828b6958a9a))
+
+- Stub qfield's main menu and add qfield_bot.call_plugin
+  ([`1488072`](https://github.com/Joonalai/qfield-dev-tools/commit/148807209670f144dbf8b3acae9ef1c470bd1891))
+
+
 ## v0.12.0 (2026-11-13)
 
 ### Features
