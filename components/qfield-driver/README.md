@@ -96,7 +96,10 @@ Other methods: `click`, `long_press`, `drag`, `type_text`, `key`, `screenshot`,
 
 - Tapping and typing: `tap_object`, `tap_text`, `tap_icon`, `type_into`,
   `expand_drawer`, `wait_visible`, `wait_for_text` (toasts), `scan_code` (QField's
-  code reader).
+  code reader). A Popup, such as the `dashBoard` drawer, works as the `root` of
+  the tap helpers; they search its content.
+- Main menu: `open_main_menu` (from the dashboard, as a user does) and
+  `main_menu_items` (object name, text and icon of the shown items, in order).
 - Project and map: `open_project`, `frame_map`, `tap_map`, `long_press_map`,
   `frame_and_tap`, `set_active_layer`, `digitize_point`.
 - Forms: `open_feature_form`, `edit_in_form`, `current_form` (the open form, also a

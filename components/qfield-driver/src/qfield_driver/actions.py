@@ -60,6 +60,10 @@ OVERLAY_FORM = f"{OVERLAY_DRAWER}.contentItem"
 SAVE_ICON = "ic_check_white_24dp"
 EDIT_ICON = "ic_edit_attributes"
 FORM_MENU_ICON = "ic_dot_menu_black_24dp"
+MENU_ICON = "ic_menu_white_24dp"
+DASHBOARD = "find('dashBoard')"
+DASHBOARD_MENU_ICON = "ic_dot_menu_black_24dp"
+MAIN_MENU = "find('mainMenu')"
 
 
 def js(value: object) -> str:
@@ -184,6 +188,40 @@ def expand_drawer(app: QFieldApp, object_name: str) -> None:
     app.wait(f"return !{drawer}.collapsed", 10)
     # The drawer grows in a 200 ms animation.
     time.sleep(0.5)
+
+
+def open_main_menu(app: QFieldApp) -> None:
+    """Open QField's main menu as a user does, from the dashboard."""
+    if app.eval(f"return {MAIN_MENU}.opened"):
+        return
+    if not app.eval(f"return {DASHBOARD}.opened"):
+        tap_icon(app, MENU_ICON)
+        app.wait(f"return {DASHBOARD}.opened")
+    tap_icon(app, DASHBOARD_MENU_ICON, root=DASHBOARD)
+    app.wait(f"return {MAIN_MENU}.opened")
+
+
+def main_menu_items(app: QFieldApp) -> list[dict[str, str]]:
+    """Object name, text and icon of the shown items of the main menu, in order.
+
+    Separators and the undo and redo row are left out. Items are shown only
+    while the menu is open.
+    """
+    return app.eval(f"""
+      const menu = {MAIN_MENU};
+      const items = [];
+      for (let i = 0; i < menu.count; i++) {{
+        const item = menu.itemAt(i);
+        if (!item || item.text === undefined || !item.visible || item.height === 0)
+          continue;
+        items.push({{
+          objectName: String(item.objectName),
+          text: String(item.text),
+          icon: item.icon ? String(item.icon.source) : '',
+        }});
+      }}
+      return items;
+    """)
 
 
 # Cloud
