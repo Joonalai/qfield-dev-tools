@@ -27,13 +27,18 @@ import logging
 import os
 import time
 from pathlib import Path
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Literal
 
 from mcp.server.mcpserver import Image, MCPServer
 from mcp.server.mcpserver.exceptions import ToolError
 
 from qfield_driver import actions
 from qfield_driver.app import BINARY_ENV, QFieldApp, local_app
+from qfield_driver.positioning import (
+    DEFAULT_HORIZONTAL_ACCURACY,
+    DEFAULT_VERTICAL_ACCURACY,
+    FixQuality,
+)
 from qfield_fetch import appimage, default_cache_dir
 from qfield_mcp.devices import Devices, clean_orphans
 
@@ -492,11 +497,33 @@ def open_project(
 
 
 @tool
-def set_position(x: float, y: float, *, device: str = "device") -> str:
-    """Feed a GNSS fix at a project CRS coordinate through a fake receiver."""
+def set_position(  # noqa: PLR0913
+    x: float,
+    y: float,
+    *,
+    horizontal_accuracy: float = DEFAULT_HORIZONTAL_ACCURACY,
+    vertical_accuracy: float = DEFAULT_VERTICAL_ACCURACY,
+    fix_quality: Literal["rtk", "float_rtk", "dgps", "gps", "no_fix"] = "rtk",
+    device: str = "device",
+) -> str:
+    """Feed a GNSS fix at a project CRS coordinate through a fake receiver.
+
+    The accuracies are in metres. fix_quality is how the receiver computed
+    the fix: rtk (centimetres), float_rtk (decimetres), dgps (below a metre),
+    gps (metres) or no_fix, which QField receives but shows no position for.
+    """
+    quality = FixQuality[fix_quality.upper()]
     with devices.use(device) as app:
-        app.set_position(x, y)
-        app.wait_for_position(x, y)
+        app.set_position(
+            x,
+            y,
+            horizontal_accuracy=horizontal_accuracy,
+            vertical_accuracy=vertical_accuracy,
+            fix_quality=quality,
+        )
+        if not quality.is_valid:
+            return "sent a fix without a position"
+        app.wait_for_position(x, y, horizontal_accuracy=horizontal_accuracy)
     return "positioned"
 
 
