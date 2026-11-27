@@ -22,7 +22,7 @@ from typing import TYPE_CHECKING, Any, Protocol, cast
 
 import pytest_qgis.utils
 from PyQt6.QtCore import QObject, QPointF, QRectF, Qt, QtMsgType, QUrl
-from PyQt6.QtQml import QQmlComponent
+from PyQt6.QtQml import QJSValue, QQmlComponent, QQmlEngine
 from PyQt6.QtQuick import QQuickItem
 from qgis.core import QgsPointXY, QgsProject
 
@@ -55,6 +55,17 @@ QtObject {{
     }}
 }}
 
+"""
+
+
+_GUARDED_CALL = """
+(function (fn, self, args) {
+    try {
+        return [false, fn.apply(self, args)];
+    } catch (error) {
+        return [true, error];
+    }
+})
 """
 
 
@@ -182,6 +193,49 @@ class QFieldBot:
                 [error.toString() for error in component.errors()],
             )
         return cast("JsQObject", js_object)
+
+    def call_plugin(self, name: str, *args: Any) -> Any:  # noqa: ANN401
+        """Call a function or emit a signal of the plugin's root object.
+
+        :param name: Name of the QML function or signal.
+        :param args: Arguments, converted to JS values like QML would.
+        :return: The return value converted to Python, QObjects as is.
+        """
+        self._ensure_plugin_loaded()
+        return self.call_qml(self._get_plugin_root_object(), name, *args)
+
+    def call_qml(self, obj: QObject, name: str, *args: Any) -> Any:  # noqa: ANN401
+        """Call a function or emit a signal of any QML object, see `call_plugin`."""
+        engine = self._qml_engine
+        target = self._to_js(engine, obj)
+        function = target.property(name)
+        if not function.isCallable():
+            msg = f"{obj.objectName() or obj} has no function or signal {name!r}"
+            raise AttributeError(msg)
+        # Calling the function directly hides a thrown non-Error, like
+        # `throw "text"`, as a return value.
+        guarded = engine.evaluate(_GUARDED_CALL)
+        js_args = engine.newArray(len(args))
+        for index, arg in enumerate(args):
+            js_args.setProperty(index, self._to_js(engine, arg))
+        outcome = guarded.call([function, target, js_args])
+        threw, value = outcome.property(0), outcome.property(1)
+        if threw.toBool():
+            msg = f"{name} threw: {value.toString()}"
+            raise RuntimeError(msg)
+        return value.toVariant()
+
+    @staticmethod
+    def _to_js(engine: "QQmlApplicationEngine", value: Any) -> QJSValue:  # noqa: ANN401
+        if isinstance(value, QObject):
+            # newQObject hands a parentless object without an explicit
+            # ownership to the JS garbage collector, which would delete it
+            # under Python. Objects JS already owns stay its to collect.
+            cpp = QQmlEngine.ObjectOwnership.CppOwnership
+            if value.parent() is None and QQmlEngine.objectOwnership(value) == cpp:
+                QQmlEngine.setObjectOwnership(value, cpp)
+            return engine.newQObject(value)
+        return engine.toScriptValue(value)
 
     def get_item(self, object_name: str) -> "QQuickItem":
         self._ensure_plugin_loaded()
