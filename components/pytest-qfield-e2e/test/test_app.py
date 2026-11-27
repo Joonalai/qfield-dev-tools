@@ -116,6 +116,22 @@ def test_fake_gnss_accuracy(qfield_app: QFieldApp, project_file: Path) -> None:
     qfield_app.wait_for_position(x, y, horizontal_accuracy=0.01)
 
 
+def test_main_menu_opens_from_the_dashboard(
+    qfield_app: QFieldApp, project_file: Path
+) -> None:
+    actions.open_project(qfield_app, project_file)
+
+    actions.open_main_menu(qfield_app)
+
+    items = actions.main_menu_items(qfield_app)
+    icons = [item["icon"] for item in items]
+    settings = next(i for i, icon in enumerate(icons) if "ic_tune_white_24dp" in icon)
+    assert "ic_plugin_black_24dp" in icons[settings - 1]
+    assert "ic_message_log_black_24dp" in icons[settings + 1]
+    # Already open, a second call leaves it be.
+    actions.open_main_menu(qfield_app)
+
+
 def test_typing_reaches_a_text_field(qfield_app: QFieldApp) -> None:
     qfield_app.eval("""
       state.field = Qt.createQmlObject(
