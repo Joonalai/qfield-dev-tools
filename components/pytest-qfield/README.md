@@ -42,9 +42,10 @@ Some QField QML code locates objects through `iface.findItemByObjectName("...")`
 
 | Fixture Name | Registered `objectName` | Description |
 | --- | --- | --- |
-| `qfield_positioning_stub` | `positionSource` | QField `Positioning` item — `active` flag and `projectedPosition` (x, y). |
+| `qfield_positioning_stub` | `positionSource` | QField `Positioning` item — `active` flag, `projectedPosition` (x, y), `positionInformation` (`hacc`, `haccValid`, `vacc`, `vaccValid`, `accuracyQuality`), `projectedHorizontalAccuracy` and the `badAccuracyThreshold` / `excellentAccuracyThreshold` that classify `accuracyQuality`. `hacc` is the horizontal and `vacc` the vertical accuracy, as QField names them. Pass `horizontal_accuracy` / `vertical_accuracy` in metres (`None`, the default, is an invalid accuracy) and call `set_accuracy(horizontal_accuracy, vertical_accuracy)` to change them mid-test; `positionInformationChanged` notifies QML. |
+| `qfield_positioning_settings_stub` | `positioningSettings` | `PositioningSettings` accuracy settings — `accuracyIndicator`, `accuracyBad`, `accuracyExcellent` and `accuracyRequirement`, with QField's defaults. |
 | `qfield_geometry_highlighter_stub` | `geometryHighlighter` | `GeometryHighlighter` exposing `geometryWrapper`, `duration`, `visible`, and `update()`. |
-| `qfield_feature_list_form_stub` | `featureForm` | `FeatureListForm` — drive an existing feature's attribute form via `model.setFeatures(layer, filter)`, `selection.focusedItem`, `state` (`"Hidden"` / `"FeatureList"` / `"FeatureForm"` read-only view / `"FeatureFormEdit"` edit), and `visible` (true whenever a feature is shown). `selection.focusedFeature` / `focusedLayer` resolve the focused occurrence from the last `setFeatures` call. The QML id is `featureListForm` but plugins look it up by `objectName` `"featureForm"`. |
+| `qfield_feature_list_form_stub` | `featureForm` | `FeatureListForm` — drive an existing feature's attribute form via `model.setFeatures(layer, filter)`, `selection.focusedItem`, `state` (`"Hidden"` / `"FeatureList"` / `"FeatureForm"` read-only view / `"FeatureFormEdit"` edit), and `visible` (true whenever a feature is shown). `selection.focusedFeature` / `focusedLayer` resolve the focused occurrence from the last `setFeatures` call. `moveFeaturesToolbar` (`moveFeaturesRequested`) and `rotateFeaturesToolbar` (`rotateFeaturesRequested`) have `confirm` and `cancel` signals that clear the flag and emit `moveConfirmed` / `moveCanceled` (`rotateConfirmed` / `rotateCanceled`). `digitizingToolbar` (`geometryRequested`) has a `confirm()` function emitting `confirmed` and a `cancel` signal, both clearing the flag, as in QField. The QML id is `featureListForm` but plugins look it up by `objectName` `"featureForm"`. |
 | `qfield_overlay_feature_form_drawer_stub` | `overlayFeatureFormDrawer` | `overlayFeatureFormDrawer` — the drawer that covers the map after digitizing a feature. Exposes `opened`. Distinct from `featureForm`. |
 
 For the form stub, tests typically drive the canonical pattern from QML and assert on the captured calls:
@@ -77,8 +78,12 @@ from pytest_qfield.stub_interface.qfield_stubs import QFieldPositioningStub
 
 @pytest.fixture
 def qfield_positioning_stub() -> QFieldPositioningStub:
-    return QFieldPositioningStub(x=389870.0, y=6678167.0, active=True)
+    return QFieldPositioningStub(
+        x=389870.0, y=6678167.0, active=True, horizontal_accuracy=2.0
+    )
 ```
+
+See [`test/test_position_accuracy.py`](test/test_position_accuracy.py) for a plugin that cancels QField's move, rotate and digitize tools when the fix is too inaccurate.
 
 See [`test/test_named_item_overrides.py`](test/test_named_item_overrides.py) for a complete working example. To assert behaviour when a named item is *missing*, clear the registration on the iface stub or override the fixture to return a sentinel.
 
