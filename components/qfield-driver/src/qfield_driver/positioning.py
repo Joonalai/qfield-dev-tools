@@ -21,12 +21,56 @@
 from __future__ import annotations
 
 import datetime as dt
+import math
 import socket
 import threading
-from functools import reduce
+from enum import IntEnum
+from functools import partial, reduce
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
 
 SEND_INTERVAL_S = 0.5
 MINUTES = 60
+DEFAULT_HORIZONTAL_ACCURACY = 0.01
+DEFAULT_VERTICAL_ACCURACY = 0.02
+
+
+class FixQuality(IntEnum):
+    """How a receiver computed a fix, the GGA quality indicator.
+
+    Typical errors: GPS metres, DGPS below a metre, FLOAT_RTK decimetres and
+    RTK centimetres. QField shows no position for NO_FIX.
+    """
+
+    NO_FIX = 0
+    GPS = 1
+    DGPS = 2
+    PPS = 3
+    RTK = 4
+    FLOAT_RTK = 5
+    ESTIMATED = 6
+    MANUAL = 7
+    SIMULATION = 8
+
+    @property
+    def is_valid(self) -> bool:
+        """Whether QField accepts a fix of this quality."""
+        return self is not FixQuality.NO_FIX
+
+
+# QGIS takes the quality from the RMC mode unless GGA reports RTK.
+_RMC_MODES = {
+    FixQuality.GPS: "A",
+    FixQuality.DGPS: "D",
+    FixQuality.PPS: "P",
+    FixQuality.RTK: "R",
+    FixQuality.FLOAT_RTK: "F",
+    FixQuality.ESTIMATED: "E",
+    FixQuality.MANUAL: "M",
+    FixQuality.SIMULATION: "S",
+}
 
 
 def _checksum(body: str) -> str:
@@ -45,16 +89,35 @@ def _angle(value: float, degree_digits: int, positive: str, negative: str) -> st
     return f"{degrees:0{degree_digits}d}{minutes:010.7f},{hemisphere}"
 
 
-def nmea(latitude: float, longitude: float, altitude: float = 10.0) -> bytes:
-    """GGA and RMC sentences of a fix at a WGS84 position, timed now."""
+def nmea(  # noqa: PLR0913
+    latitude: float,
+    longitude: float,
+    altitude: float = 10.0,
+    *,
+    horizontal_accuracy: float = DEFAULT_HORIZONTAL_ACCURACY,
+    vertical_accuracy: float = DEFAULT_VERTICAL_ACCURACY,
+    fix_quality: FixQuality = FixQuality.RTK,
+) -> bytes:
+    """GGA, RMC and GST sentences of a fix at a WGS84 position, timed now.
+
+    The accuracies are in metres. QField reads the horizontal one from the
+    GST latitude and longitude errors and the vertical one from its altitude
+    error.
+    """
+    fix_quality = FixQuality(fix_quality)
     now = dt.datetime.now(dt.UTC)
     time = now.strftime("%H%M%S.00")
     date = now.strftime("%d%m%y")
     lat = _angle(latitude, 2, "N", "S")
     lon = _angle(longitude, 3, "E", "W")
-    gga = f"GPGGA,{time},{lat},{lon},4,12,0.6,{altitude:.1f},M,18.0,M,,"
-    rmc = f"GPRMC,{time},A,{lat},{lon},0.0,0.0,{date},,,R"
-    gst = f"GPGST,{time},0.010,0.010,0.010,0.0,0.010,0.010,0.020"
+    status = "A" if fix_quality.is_valid else "V"
+    mode = _RMC_MODES.get(fix_quality, "N")
+    gga = (
+        f"GPGGA,{time},{lat},{lon},{int(fix_quality)},12,0.6,{altitude:.1f},M,18.0,M,,"
+    )
+    rmc = f"GPRMC,{time},{status},{lat},{lon},0.0,0.0,{date},,,{mode}"
+    h = f"{horizontal_accuracy:.3f}"
+    gst = f"GPGST,{time},{h},{h},{h},0.0,{h},{h},{vertical_accuracy:.3f}"
     return _sentence(gga) + _sentence(rmc) + _sentence(gst)
 
 
@@ -62,7 +125,7 @@ class NmeaServer:
     """Streams a settable position to every connected client."""
 
     def __init__(self) -> None:
-        self._position: tuple[float, float] | None = None
+        self._fix: Callable[[], bytes] | None = None
         self._lock = threading.Lock()
         self._stop = threading.Event()
         self._server = socket.create_server(("127.0.0.1", 0))
@@ -74,14 +137,38 @@ class NmeaServer:
         """QField's positioning device id for this receiver."""
         return f"tcp:127.0.0.1:{self._server.getsockname()[1]}"
 
-    def set_position(self, latitude: float, longitude: float) -> None:
+    def set_position(
+        self,
+        latitude: float,
+        longitude: float,
+        *,
+        horizontal_accuracy: float = DEFAULT_HORIZONTAL_ACCURACY,
+        vertical_accuracy: float = DEFAULT_VERTICAL_ACCURACY,
+        fix_quality: FixQuality = FixQuality.RTK,
+    ) -> None:
+        """Send fixes at a WGS84 position, see :func:`nmea` for the rest."""
+        for name, accuracy in (
+            ("horizontal_accuracy", horizontal_accuracy),
+            ("vertical_accuracy", vertical_accuracy),
+        ):
+            if not math.isfinite(accuracy) or accuracy < 0:
+                msg = f"{name} must be a finite number of metres >= 0, not {accuracy}"
+                raise ValueError(msg)
+        fix = partial(
+            nmea,
+            latitude,
+            longitude,
+            horizontal_accuracy=horizontal_accuracy,
+            vertical_accuracy=vertical_accuracy,
+            fix_quality=FixQuality(fix_quality),
+        )
         with self._lock:
-            self._position = (latitude, longitude)
+            self._fix = fix
 
     def clear_position(self) -> None:
         """Stop sending fixes, as a receiver losing the sky would."""
         with self._lock:
-            self._position = None
+            self._fix = None
 
     def _accept(self) -> None:
         while not self._stop.is_set():
@@ -97,11 +184,11 @@ class NmeaServer:
         with client:
             while not self._stop.wait(SEND_INTERVAL_S):
                 with self._lock:
-                    position = self._position
-                if position is None:
+                    fix = self._fix
+                if fix is None:
                     continue
                 try:
-                    client.sendall(nmea(*position))
+                    client.sendall(fix())
                 except OSError:
                     return
 
